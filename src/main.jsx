@@ -92,17 +92,31 @@ function formatClock(seconds) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function timerTone(seconds) {
-  if (seconds <= 1800) return "text-kill border-kill/70 pulse-fast";
-  if (seconds <= 3600) return "text-hazard border-hazard/70";
-  return "text-white border-white/25";
+function timerClass(seconds) {
+  if (seconds <= 1800) return "threat";
+  if (seconds <= 3600) return "amber";
+  return "";
 }
 
-function classTone(classification) {
-  const value = classification?.toUpperCase();
-  if (value === "CRITICAL") return "border-kill/70 bg-kill/10 text-red-100";
-  if (value === "SIMPLIFY") return "border-hazard/70 bg-hazard/10 text-yellow-100";
-  return "border-black bg-black text-zinc-300";
+function probClass(prob) {
+  if (prob === null || prob === undefined) return "";
+  if (prob < 40) return "danger";
+  if (prob < 65) return "warning";
+  return "safe";
+}
+
+function taskCardClass(classification) {
+  const v = classification?.toUpperCase();
+  if (v === "CRITICAL") return "task-critical";
+  if (v === "SIMPLIFY") return "task-simplify";
+  return "task-drop";
+}
+
+function badgeClass(classification) {
+  const v = classification?.toUpperCase();
+  if (v === "CRITICAL") return "badge badge-critical";
+  if (v === "SIMPLIFY") return "badge badge-simplify";
+  return "badge badge-drop";
 }
 
 function minutesFromSituation(situation) {
@@ -140,6 +154,282 @@ function useGemini() {
   }, []);
 }
 
+// ─── INTAKE SCREEN ───────────────────────────────────────────────────────────
+function IntakeScreen({ situation, setSituation, onActivate, isActing, error }) {
+  return (
+    <main className="min-h-screen" style={{ background: "#080a0c" }}>
+      {/* Top bar */}
+      <div style={{
+        borderBottom: "1px solid #1e2a36",
+        padding: "1rem 1.5rem",
+        display: "flex",
+        alignItems: "center",
+        gap: "0.75rem"
+      }}>
+        <div style={{
+          width: "8px", height: "8px",
+          background: "#ff2d4b",
+          borderRadius: "50%",
+          boxShadow: "0 0 8px rgba(255,45,75,0.8)"
+        }} />
+        <span className="label-xs" style={{ color: "#4a5a6a" }}>LIMITBREAKER AI — EMERGENCY DEADLINE TRIAGE SYSTEM</span>
+      </div>
+
+      <div style={{
+        maxWidth: "720px",
+        margin: "0 auto",
+        padding: "4rem 1.5rem 2rem",
+        minHeight: "calc(100vh - 60px)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}>
+        {/* Hero */}
+        <div className="animate-in">
+          <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{ height: "1px", width: "24px", background: "#ff2d4b" }} />
+            <span className="label-threat">SYSTEM READY</span>
+          </div>
+
+          <h1 style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: "clamp(2.2rem, 5vw, 3.6rem)",
+            lineHeight: 1.1,
+            letterSpacing: "-0.025em",
+            color: "#fff",
+            margin: "0 0 1.25rem",
+          }}>
+            When the clock is against you,<br />
+            <span style={{ color: "#ff2d4b" }}>LimitBreaker</span> decides<br />
+            what survives.
+          </h1>
+
+          <p style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: "0.85rem",
+            color: "#4a5a6a",
+            lineHeight: 1.6,
+            marginBottom: "2.5rem",
+            borderLeft: "2px solid #1e2a36",
+            paddingLeft: "1rem",
+          }}>
+            Not a planner. Not a scheduler. A 6-agent triage system that makes hard
+            trade-offs under time pressure — so you don't have to.
+          </p>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="error-block animate-in" style={{ marginBottom: "1rem" }}>
+            <p className="label-threat" style={{ marginBottom: "0.25rem" }}>Mission initialization failed</p>
+            <p style={{ fontFamily: "mono", fontSize: "0.8rem", color: "#8b9ab0" }}>{error}</p>
+          </div>
+        )}
+
+        {/* Input */}
+        <div className="animate-in" style={{ animationDelay: "80ms" }}>
+          <label className="label-xs" style={{ display: "block", marginBottom: "0.75rem" }}>
+            Describe your situation — deadline, what's done, what's not. Don't filter.
+          </label>
+          <textarea
+            className="intake-textarea"
+            style={{ minHeight: "160px" }}
+            value={situation}
+            onChange={(e) => setSituation(e.target.value)}
+            placeholder="I have 4 hours. Hackathon submission due. PPT 60% done, README missing, demo not recorded, deployment failing..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) onActivate(e);
+            }}
+          />
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginTop: "0.5rem",
+            marginBottom: "1rem"
+          }}>
+            <span className="label-xs">⌘↵ to activate</span>
+            <span className="label-xs">{situation.length} chars</span>
+          </div>
+
+          <button
+            className="btn-primary"
+            style={{ width: "100%", fontSize: "0.85rem" }}
+            onClick={onActivate}
+            disabled={isActing || !situation.trim()}
+          >
+            {isActing ? "INITIALIZING TRIAGE SYSTEM..." : "ACTIVATE LIMITBREAKER →"}
+          </button>
+        </div>
+
+        {/* Feature pills */}
+        <div className="animate-in" style={{
+          marginTop: "2rem",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "0.5rem",
+          animationDelay: "160ms"
+        }}>
+          {["6-Agent Pipeline", "Sacrifice Report", "Live Replanning", "Success Probability", "Mission Debrief"].map(f => (
+            <span key={f} style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "0.65rem",
+              letterSpacing: "0.08em",
+              color: "#4a5a6a",
+              border: "1px solid #1e2a36",
+              padding: "0.3rem 0.6rem",
+              background: "rgba(255,255,255,0.02)",
+            }}>
+              {f}
+            </span>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ─── MISSION HEADER ───────────────────────────────────────────────────────────
+function MissionHeader({ mission, onCheckin, onEndMission, isActing }) {
+  const tc = timerClass(mission.remainingSeconds);
+  const pc = probClass(mission.probability);
+  const progress = mission.plan.length > 0
+    ? (mission.completedTasks.length / Math.max(1, mission.plan.length)) * 100
+    : 0;
+
+  return (
+    <header style={{
+      position: "sticky",
+      top: 0,
+      zIndex: 20,
+      background: "rgba(8,10,12,0.95)",
+      borderBottom: "1px solid #1e2a36",
+      backdropFilter: "blur(12px)",
+    }}>
+      <div className="mission-progress">
+        <div className="mission-progress-fill" style={{ width: `${progress}%` }} />
+      </div>
+      <div style={{
+        maxWidth: "1200px",
+        margin: "0 auto",
+        padding: "0.75rem 1.25rem",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "1rem",
+      }}>
+        {/* Left: Codename */}
+        <div>
+          <div className="label-xs" style={{ marginBottom: "0.2rem" }}>LIMITBREAKER AI</div>
+          <div style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: "clamp(0.9rem, 2vw, 1.3rem)",
+            color: "#fff",
+            letterSpacing: "-0.01em",
+          }}>
+            {mission.codename || "MISSION: CLASSIFIED"}
+          </div>
+        </div>
+
+        {/* Right: Probability + Timer + Actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {/* Probability */}
+          <div style={{
+            background: "#0d1117",
+            border: "1px solid #1e2a36",
+            padding: "0.4rem 0.9rem",
+            textAlign: "right",
+            display: "none",
+          }} className="prob-header-block">
+            <div className="label-xs" style={{ marginBottom: "0.15rem" }}>SUCCESS ODDS</div>
+            <div style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: "1.5rem",
+              color: pc === "danger" ? "#ff2d4b" : pc === "warning" ? "#f59e0b" : "#00d4ff",
+              lineHeight: 1,
+              transition: "color 600ms ease",
+            }}>
+              {mission.probability ?? "--"}%
+            </div>
+          </div>
+
+          {/* Timer */}
+          <div style={{
+            background: "#0d1117",
+            border: `1px solid ${tc === "threat" ? "rgba(255,45,75,0.4)" : tc === "amber" ? "rgba(245,158,11,0.3)" : "#1e2a36"}`,
+            padding: "0.4rem 0.9rem",
+            textAlign: "right",
+            minWidth: "120px",
+          }}>
+            <div className="label-xs" style={{ marginBottom: "0.15rem" }}>TIME LEFT</div>
+            <div className={`timer-display ${tc}`}>
+              {formatClock(mission.remainingSeconds)}
+            </div>
+          </div>
+
+          {/* Quick actions - only in locked phase */}
+          {mission.phase === "locked" && (
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button className="btn-operative" onClick={onCheckin}>
+                Check-in
+              </button>
+              <button className="btn-threat" onClick={onEndMission} disabled={isActing}>
+                End
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Inline style for responsive prob block */}
+      <style>{`
+        @media(min-width: 640px) { .prob-header-block { display: block !important; } }
+      `}</style>
+    </header>
+  );
+}
+
+// ─── PANEL COMPONENT ──────────────────────────────────────────────────────────
+function Panel({ title, variant = "default", tag, children, style = {} }) {
+  const borderMap = {
+    default: "1px solid #1e2a36",
+    threat: "1px solid rgba(255,45,75,0.25)",
+    operative: "1px solid rgba(0,212,255,0.2)",
+  };
+  const labelColorMap = {
+    default: "#4a5a6a",
+    threat: "#ff2d4b",
+    operative: "#00d4ff",
+  };
+
+  return (
+    <section className="animate-in" style={{
+      background: "#0d1117",
+      border: borderMap[variant],
+      padding: "1.25rem",
+      boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.35)",
+      ...style
+    }}>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: "1rem",
+        paddingBottom: "0.75rem",
+        borderBottom: "1px solid #131920",
+      }}>
+        <span className="label-xs" style={{ color: labelColorMap[variant] }}>{title}</span>
+        {tag && <span className="badge badge-critical">{tag}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const ai = useGemini();
   const [mission, setMission] = useState(() => {
@@ -161,40 +451,31 @@ function App() {
     });
   }, []);
 
-  const pushTimeline = useCallback(
-    (step) => {
-      writeMission((current) => ({
-        ...current,
-        timeline: [...(current.timeline || []), step],
-      }));
-    },
-    [writeMission],
-  );
+  const pushTimeline = useCallback((step) => {
+    writeMission((current) => ({
+      ...current,
+      timeline: [...(current.timeline || []), step],
+    }));
+  }, [writeMission]);
 
-  const callGemini = useCallback(
-    async (agent, prompt, parser = extractJson) => {
-      if (!ai) {
-        throw new Error("Missing VITE_GEMINI_API_KEY. Add it to .env.local and restart Vite.");
-      }
-      try {
-        const response = await ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: `${HARD_PERSONALITY}\n${prompt}`,
-        });
-        const text = response.text || "";
-        return parser(text);
-      } catch (error) {
-        throw new Error(`[${agent}] ${error.message}`);
-      }
-    },
-    [ai],
-  );
+  const callGemini = useCallback(async (agent, prompt, parser = extractJson) => {
+    if (!ai) throw new Error("Missing VITE_GEMINI_API_KEY. Add it to .env.local and restart Vite.");
+    try {
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: `${HARD_PERSONALITY}\n${prompt}`,
+      });
+      const text = response.text || "";
+      return parser(text);
+    } catch (error) {
+      throw new Error(`[${agent}] ${error.message}`);
+    }
+  }, [ai]);
 
-  const updateProbability = useCallback(
-    async (baseMission) => {
-      const result = await callGemini(
-        "PROBABILITY ENGINE",
-        `Given these remaining tasks and this time remaining, output only JSON:
+  const updateProbability = useCallback(async (baseMission) => {
+    const result = await callGemini(
+      "PROBABILITY ENGINE",
+      `Given these remaining tasks and this time remaining, output only JSON:
 {
   "probability": number,
   "biggest_risk": string,
@@ -203,19 +484,16 @@ function App() {
 }
 Probability is 0-100. Be realistic, not optimistic.
 Remaining minutes: ${Math.ceil(baseMission.remainingSeconds / 60)}
-Tasks: ${JSON.stringify(baseMission.triage.filter((task) => task.classification !== "DROP"))}`,
-      );
-
-      return {
-        ...baseMission,
-        probability: result.probability,
-        biggestRisk: result.biggest_risk,
-        mostValuableTask: result.most_valuable_task,
-        probabilityReasoning: result.reasoning,
-      };
-    },
-    [callGemini],
-  );
+Tasks: ${JSON.stringify(baseMission.triage.filter((t) => t.classification !== "DROP"))}`,
+    );
+    return {
+      ...baseMission,
+      probability: result.probability,
+      biggestRisk: result.biggest_risk,
+      mostValuableTask: result.most_valuable_task,
+      probabilityReasoning: result.reasoning,
+    };
+  }, [callGemini]);
 
   const activateMission = async (event) => {
     event?.preventDefault();
@@ -236,7 +514,6 @@ Tasks: ${JSON.stringify(baseMission.triage.filter((task) => task.classification 
         timeline: [],
       };
       writeMission(currentMission);
-      
       pushTimeline("MISSION ACCEPTED");
       pushTimeline("Analyzing deadline...");
 
@@ -264,7 +541,6 @@ Situation: ${input}`,
         phase: "triage",
       };
       writeMission(currentMission);
-      
       pushTimeline("Running TRIAGE AGENT...");
 
       const triage = await callGemini(
@@ -282,10 +558,9 @@ Set time_saved_minutes to 0 unless classification is DROP.
 Situation: ${input}`,
         extractJsonArray,
       );
-      const dropped = triage.filter((task) => task.classification === "DROP");
+      const dropped = triage.filter((t) => t.classification === "DROP");
       currentMission = { ...currentMission, triage, dropped, phase: "questions" };
       writeMission(currentMission);
-      
       pushTimeline("✓ Triage Complete");
       pushTimeline("Running REALITY CHECK...");
 
@@ -300,7 +575,6 @@ Current triage: ${JSON.stringify(triage)}`,
       currentMission = { ...currentMission, questions: questions.questions ?? [], phase: "questions" };
       writeMission(currentMission);
       pushTimeline("Waiting for reality check input...");
-
     } catch (error) {
       setMissionError(error.message);
     } finally {
@@ -354,7 +628,7 @@ Adjusted triage: ${JSON.stringify(adjusted)}`,
       const next = {
         ...mission,
         triage: adjusted,
-        dropped: adjusted.filter((task) => task.classification === "DROP"),
+        dropped: adjusted.filter((t) => t.classification === "DROP"),
         plan: planData.plan ?? [],
         lockTime: Date.now(),
         checkInDueAt: Date.now() + CHECK_IN_INTERVAL_MINUTES * 60 * 1000,
@@ -367,11 +641,8 @@ Adjusted triage: ${JSON.stringify(adjusted)}`,
           from: mission.initialProbability,
           to: planData.updated_probability,
         },
+        timeline: [...(mission.timeline || []), "✓ Rescue Plan Locked", "✓ Mission Active"],
       };
-      
-      const newTimeline = [...(next.timeline || []), "✓ Rescue Plan Locked", "✓ Mission Active"];
-      next.timeline = newTimeline;
-      
       writeMission(next);
     } catch (error) {
       setMissionError(error.message);
@@ -387,9 +658,7 @@ Adjusted triage: ${JSON.stringify(adjusted)}`,
     try {
       pushTimeline("User BEHIND. Running REPLANNING AGENT...");
       const incompleteTasks = mission.triage.filter(
-        (task) =>
-          task.classification !== "DROP" &&
-          !mission.completedTasks.includes(task.task),
+        (t) => t.classification !== "DROP" && !mission.completedTasks.includes(t.task),
       );
       const result = await callGemini(
         "REPLANNING AGENT",
@@ -408,13 +677,16 @@ Remaining incomplete tasks: ${JSON.stringify(incompleteTasks)}`,
       let nextMission = {
         ...mission,
         triage: result.triage ?? mission.triage,
-        dropped: (result.triage ?? mission.triage).filter((task) => task.classification === "DROP"),
+        dropped: (result.triage ?? mission.triage).filter((t) => t.classification === "DROP"),
         plan: result.plan ?? mission.plan,
         checkInDueAt: Date.now() + CHECK_IN_INTERVAL_MINUTES * 60 * 1000,
       };
-      
       nextMission = await updateProbability(nextMission);
-      nextMission.timeline = [...(nextMission.timeline || []), `REPLANNING AGENT: ${result.message}`, "✓ Rescue Plan Updated"];
+      nextMission.timeline = [
+        ...(nextMission.timeline || []),
+        `REPLANNING AGENT: ${result.message}`,
+        "✓ Rescue Plan Updated",
+      ];
       writeMission(nextMission);
     } catch (error) {
       setMissionError(error.message);
@@ -437,7 +709,6 @@ Remaining incomplete tasks: ${JSON.stringify(incompleteTasks)}`,
       ...mission,
       checkInDueAt: Date.now() + CHECK_IN_INTERVAL_MINUTES * 60 * 1000,
     };
-
     if (status === "DONE") {
       nextMission = {
         ...nextMission,
@@ -445,13 +716,16 @@ Remaining incomplete tasks: ${JSON.stringify(incompleteTasks)}`,
         currentTaskIndex: Math.min(mission.currentTaskIndex + 1, mission.plan.length - 1),
       };
     }
-
     try {
       nextMission = await updateProbability(nextMission);
-      nextMission.timeline = [...(nextMission.timeline || []), `Progress Update: ${status}`, "✓ Probabilities Updated"];
+      nextMission.timeline = [
+        ...(nextMission.timeline || []),
+        `Progress Update: ${status}`,
+        "✓ Probabilities Updated",
+      ];
     } catch (error) {
       setMissionError(error.message);
-      return; // Do not advance if probability update fails
+      return;
     }
     writeMission(nextMission);
   };
@@ -476,7 +750,7 @@ Final probability: ${mission.probability}`,
         phase: "debrief",
         finalDebrief: {
           completed: mission.completedTasks.length,
-          total: mission.triage.filter((task) => task.classification !== "DROP").length,
+          total: mission.triage.filter((t) => t.classification !== "DROP").length,
           dropped: mission.dropped.length,
           timeRemaining: Math.ceil(mission.remainingSeconds / 60),
           originalProbability: mission.initialProbability,
@@ -491,6 +765,7 @@ Final probability: ${mission.probability}`,
     }
   }, [callGemini, mission, writeMission, pushTimeline]);
 
+  // Timer tick
   useEffect(() => {
     if (mission.phase !== "locked" || !mission.lockTime) return;
     const tick = setInterval(() => {
@@ -504,172 +779,183 @@ Final probability: ${mission.probability}`,
     return () => clearInterval(tick);
   }, [mission.phase, mission.lockTime, writeMission]);
 
+  // Check-in / finish triggers
   useEffect(() => {
     if (mission.phase !== "locked" || activeOverlay) return;
     if (mission.remainingSeconds <= 0) {
-      const timeout = setTimeout(() => {
-        finishMission().catch(() => {});
-      }, 0);
-      return () => clearTimeout(timeout);
+      const t = setTimeout(() => finishMission().catch(() => {}), 0);
+      return () => clearTimeout(t);
     }
     if (mission.checkInDueAt && Date.now() >= mission.checkInDueAt) {
-      const timeout = setTimeout(() => setActiveOverlay("checkin"), 0);
-      return () => clearTimeout(timeout);
+      const t = setTimeout(() => setActiveOverlay("checkin"), 0);
+      return () => clearTimeout(t);
     }
   }, [activeOverlay, finishMission, mission]);
 
+  // Reset debrief ref
   useEffect(() => {
-    if (mission.phase !== "debrief") {
-      debriefRequestedRef.current = false;
-      return;
-    }
+    if (mission.phase !== "debrief") { debriefRequestedRef.current = false; return; }
     debriefRequestedRef.current = true;
   }, [mission.phase]);
 
+  // Auto-scroll timeline
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mission.timeline]);
 
   const unanswered = mission.questions.filter(
-    (question) => !mission.answers.some((answer) => answer.id === question.id),
+    (q) => !mission.answers.some((a) => a.id === q.id),
   );
   const currentBlock = mission.plan[mission.currentTaskIndex] ?? mission.plan.at(-1);
-  const currentTaskDuration = currentBlock ? parsePlanBlock(currentBlock) : 0;
 
+  // ── INTAKE SCREEN ──
   if (mission.phase === "intake") {
     return (
-      <main className="min-h-screen bg-bunker text-white">
-        <section className="mx-auto flex min-h-screen max-w-4xl flex-col justify-center px-5 py-10 animate-fade-in">
-          <p className="mb-3 font-mono text-sm uppercase tracking-[0.45em] text-signal">
-            LimitBreaker AI — The Emergency Deadline Triage System
-          </p>
-          <h1 className="max-w-3xl text-5xl font-black uppercase tracking-tight md:text-7xl">
-            When the clock is against you, LimitBreaker decides what survives.
-          </h1>
-          <p className="mt-5 max-w-2xl border-l-4 border-kill pl-4 font-mono text-lg text-zinc-300">
-            Not a planner. A survival system for impossible deadlines.
-          </p>
-          
-          {missionError && (
-             <div className="mt-6 border border-kill/50 bg-kill/10 p-4 font-mono text-kill">
-                <p>Mission analysis failed.</p>
-                <p className="text-sm">Reason: {missionError}</p>
-             </div>
-          )}
-
-          <form onSubmit={activateMission} className="mt-10">
-            <label className="block font-mono text-sm uppercase tracking-widest text-zinc-300">
-              Describe your situation. Deadline, what&apos;s done, what&apos;s not.
-              Don&apos;t filter yourself.
-            </label>
-            <textarea
-              value={situation}
-              onChange={(event) => setSituation(event.target.value)}
-              className="mt-4 min-h-52 w-full resize-none border border-white/15 bg-armor p-5 font-mono text-lg text-white outline-none transition focus:border-signal"
-              placeholder="I have 3 hours. Final report due tonight. Outline done, data messy, slides untouched..."
-            />
-            <button
-              type="submit"
-              disabled={isActing || (!situation.trim() && !mission.situation)}
-              className="mt-5 w-full border border-signal bg-signal px-6 py-4 font-mono text-lg font-black uppercase tracking-widest text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isActing ? "INITIALIZING SYSTEM..." : "ACTIVATE LIMITBREAKER"}
-            </button>
-          </form>
-        </section>
-      </main>
+      <IntakeScreen
+        situation={situation}
+        setSituation={setSituation}
+        onActivate={activateMission}
+        isActing={isActing}
+        error={missionError}
+      />
     );
   }
 
+  // ── MISSION SCREEN ──
   return (
-    <main className="min-h-screen bg-bunker bg-[radial-gradient(circle_at_top_left,rgba(215,255,79,.14),transparent_28%),linear-gradient(rgba(255,255,255,.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.035)_1px,transparent_1px)] bg-[size:auto,34px_34px,34px_34px] text-white">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-bunker/90 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.35em] text-zinc-400">
-              LimitBreaker AI
-            </p>
-            <h1 className="text-xl font-black uppercase text-white md:text-3xl">
-              {mission.codename || "MISSION: CLASSIFIED"}
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden border border-white/10 bg-black/40 px-4 py-2 text-right font-mono md:block">
-              <p className="text-xs uppercase text-zinc-500">Success Probability</p>
-              <p className="text-2xl font-black text-signal transition-all duration-500">{mission.probability ?? "--"}%</p>
-            </div>
-            <div className={`border bg-black/60 px-4 py-2 text-right font-mono transition-colors duration-500 ${timerTone(mission.remainingSeconds)}`}>
-              <p className="text-xs uppercase text-zinc-500">Clock</p>
-              <p className="text-2xl font-black">{formatClock(mission.remainingSeconds)}</p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div style={{ minHeight: "100vh", background: "#080a0c", color: "#fff" }}>
+      <MissionHeader
+        mission={mission}
+        onCheckin={() => setActiveOverlay("checkin")}
+        onEndMission={finishMission}
+        isActing={isActing}
+      />
 
+      {/* Error bar */}
       {missionError && (
-        <div className="mx-auto max-w-7xl px-4 pt-5 animate-fade-in">
-          <div className="flex flex-wrap items-center justify-between gap-4 border border-kill bg-kill/10 p-4 shadow-hostile">
+        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "1rem 1.25rem" }}>
+          <div className="error-block animate-in" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
             <div>
-              <p className="font-mono font-black text-kill">Mission analysis failed.</p>
-              <p className="font-mono text-sm text-zinc-300">Reason: {missionError}</p>
+              <p className="label-threat" style={{ marginBottom: "0.2rem" }}>Agent error</p>
+              <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: "#8b9ab0" }}>{missionError}</p>
             </div>
-            <button 
-              onClick={() => {
-                if (mission.phase === "debrief") finishMission();
-                else if (mission.phase === "locked" && activeOverlay === "checkin") replan("BEHIND");
-                else if (mission.phase === "questions") lockPlan();
-                else activateMission();
-              }}
-              className="action-button border-kill text-kill"
-            >
-              Retry Mission
+            <button className="btn-ghost" onClick={() => {
+              if (mission.phase === "debrief") finishMission();
+              else if (mission.phase === "questions") lockPlan();
+              else activateMission();
+            }}>
+              Retry
             </button>
           </div>
         </div>
       )}
 
-      <section className="mx-auto grid max-w-7xl gap-4 px-4 py-5 lg:grid-cols-[1.1fr_.9fr]">
-        <div className="space-y-4">
-          <Panel title="Situation">
-            <p className="whitespace-pre-wrap font-mono text-sm text-zinc-300">{mission.situation}</p>
+      {/* Main grid */}
+      <div style={{
+        maxWidth: "1200px",
+        margin: "0 auto",
+        padding: "1.25rem",
+        display: "grid",
+        gridTemplateColumns: "1fr 320px",
+        gap: "1rem",
+      }}>
+        {/* LEFT COLUMN */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+          {/* Situation */}
+          <Panel title="SITUATION BRIEF">
+            <p style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "0.82rem",
+              color: "#8b9ab0",
+              lineHeight: 1.7,
+              whiteSpace: "pre-wrap",
+            }}>{mission.situation}</p>
           </Panel>
 
+          {/* Initial probability */}
           {mission.initialProbability !== null && (
-            <Panel title="Initial Success Probability" danger>
-              <p className="text-3xl font-black">
-                Without intervention:{" "}
-                <span className="text-kill">{mission.initialProbability}%</span> chance of completion
+            <Panel title="INITIAL THREAT ASSESSMENT" variant="threat">
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                <span style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "3rem",
+                  color: "#ff2d4b",
+                  lineHeight: 1,
+                }}>
+                  {mission.initialProbability}%
+                </span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem", color: "#4a5a6a" }}>
+                  chance without intervention
+                </span>
+              </div>
+              <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: "#4a5a6a", lineHeight: 1.6 }}>
+                {mission.initialReasoning}
               </p>
-              <p className="mt-2 font-mono text-sm text-zinc-400">{mission.initialReasoning}</p>
             </Panel>
           )}
 
+          {/* Triage */}
           {mission.triage.length > 0 && (
-            <Panel title="TRIAGE AGENT">
-              <div className="grid gap-3">
+            <Panel title="TRIAGE AGENT — VERDICT">
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {mission.triage.filter(t => t.classification !== "DROP").map((task) => (
-                  <article key={`${task.task}-${task.classification}`} className={`border p-4 animate-fade-in ${classTone(task.classification)}`}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-black uppercase">{task.task}</h3>
-                      <span className="font-mono text-xs font-black">{task.classification}</span>
+                  <div key={`${task.task}-${task.classification}`}
+                    className={`${taskCardClass(task.classification)} animate-in`}
+                    style={{ padding: "0.875rem 1rem" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.4rem" }}>
+                      <span style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 600,
+                        fontSize: "0.9rem",
+                        color: "#fff",
+                        lineHeight: 1.3,
+                      }}>{task.task}</span>
+                      <span className={badgeClass(task.classification)} style={{ flexShrink: 0 }}>
+                        {task.classification}
+                      </span>
                     </div>
-                    <p className="mt-2 font-mono text-sm text-zinc-300">{task.reasoning}</p>
-                  </article>
+                    <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem", color: "#8b9ab0", lineHeight: 1.5, margin: 0 }}>
+                      {task.reasoning}
+                    </p>
+                  </div>
                 ))}
               </div>
             </Panel>
           )}
 
+          {/* Sacrifice Report */}
           {mission.dropped.length > 0 && (
-            <Panel title="Sacrifice Report" danger>
-              <div className="space-y-3">
+            <Panel title="SACRIFICE REPORT — ELIMINATED" variant="threat">
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
                 {mission.dropped.map((task) => (
-                  <div key={`drop-${task.task}`} className="border border-kill/50 bg-kill/10 p-4 animate-fade-in">
-                    <p className="font-black text-kill">❌ {task.task}</p>
-                    <div className="mt-2 grid grid-cols-2 gap-2 border-l-2 border-kill/30 pl-3 font-mono text-sm text-zinc-300">
-                      <p><span className="text-zinc-500">Time Saved:</span> {task.time_saved_minutes || "--"} min</p>
-                      <p><span className="text-zinc-500">Impact Lost:</span> {task.impact_lost || "Unknown"}</p>
-                      <p className="col-span-2 mt-1"><span className="text-zinc-500">Decision:</span> DROP - {task.reasoning}</p>
+                  <div key={`drop-${task.task}`} className="animate-in" style={{
+                    background: "rgba(255,45,75,0.04)",
+                    border: "1px solid rgba(255,45,75,0.15)",
+                    padding: "0.875rem 1rem",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                      <span style={{ color: "#ff2d4b", fontSize: "0.9rem" }}>✕</span>
+                      <span style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 600,
+                        fontSize: "0.88rem",
+                        color: "#ff2d4b",
+                      }}>{task.task}</span>
+                    </div>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "0.375rem 1rem",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: "0.72rem",
+                      color: "#4a5a6a",
+                    }}>
+                      <div><span style={{ color: "#2a3a4a" }}>TIME SAVED </span>{task.time_saved_minutes || "--"} min</div>
+                      <div><span style={{ color: "#2a3a4a" }}>IMPACT LOST </span>{task.impact_lost || "Unknown"}</div>
+                      <div style={{ gridColumn: "1/-1", color: "#8b9ab0" }}>DROP — {task.reasoning}</div>
                     </div>
                   </div>
                 ))}
@@ -677,163 +963,304 @@ Final probability: ${mission.probability}`,
             </Panel>
           )}
 
+          {/* Reality Check */}
           {mission.phase === "questions" && !missionError && (
-            <Panel title="REALITY CHECK">
+            <Panel title="REALITY CHECK AGENT" variant="operative">
               {unanswered.length > 0 ? (
-                <div className="space-y-4">
-                  {unanswered.map((question) => (
-                    <div key={question.id} className="border border-white/10 bg-black/30 p-4 animate-fade-in">
-                      <p className="font-mono text-lg">{question.question}</p>
-                      <div className="mt-3 flex gap-3">
-                        <button className="action-button" onClick={() => answerQuestion(question, "YES")}>
-                          YES
-                        </button>
-                        <button className="action-button" onClick={() => answerQuestion(question, "NO")}>
-                          NO
-                        </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {unanswered.map((q) => (
+                    <div key={q.id} className="animate-in" style={{
+                      background: "rgba(0,212,255,0.03)",
+                      border: "1px solid rgba(0,212,255,0.12)",
+                      padding: "1rem",
+                    }}>
+                      <p style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 500,
+                        fontSize: "0.95rem",
+                        color: "#fff",
+                        marginBottom: "0.875rem",
+                        lineHeight: 1.4,
+                      }}>{q.question}</p>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <button className="btn-operative" onClick={() => answerQuestion(q, "YES")}>YES</button>
+                        <button className="btn-ghost" onClick={() => answerQuestion(q, "NO")}>NO</button>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <button onClick={lockPlan} disabled={isActing} className="w-full border border-signal bg-signal px-5 py-4 font-mono font-black uppercase tracking-widest text-black disabled:opacity-50">
-                  Lock Rescue Plan
+                <button
+                  className="btn-primary"
+                  style={{ width: "100%" }}
+                  onClick={lockPlan}
+                  disabled={isActing}
+                >
+                  {isActing ? "GENERATING RESCUE PLAN..." : "LOCK RESCUE PLAN →"}
                 </button>
               )}
             </Panel>
           )}
 
+          {/* Rescue Plan */}
           {mission.plan.length > 0 && (
-            <Panel title="RESCUE COMMAND">
+            <Panel title="RESCUE COMMAND — LOCKED PLAN" variant="operative">
+              {/* Probability delta */}
               {mission.probabilityDelta && (
-                <p className="mb-4 font-mono text-2xl font-black">
-                  {mission.probabilityDelta.from}% <span className="text-signal">→</span>{" "}
-                  <span className="text-signal">{mission.probabilityDelta.to}% ▲</span>
-                </p>
-              )}
-              <div className="space-y-2">
-                {mission.plan.map((block, index) => (
-                  <div
-                    key={`${block}-${index}`}
-                    className={`border p-3 font-mono text-sm animate-fade-in ${
-                      index === mission.currentTaskIndex
-                        ? "border-signal bg-signal/10 text-white"
-                        : "border-white/10 bg-black/30 text-zinc-300"
-                    }`}
-                  >
-                    {block}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "1rem",
+                  marginBottom: "1rem",
+                  padding: "0.875rem 1rem",
+                  background: "rgba(0,212,255,0.04)",
+                  border: "1px solid rgba(0,212,255,0.12)",
+                }}>
+                  <div>
+                    <div className="label-xs" style={{ marginBottom: "0.2rem" }}>WITHOUT PLAN</div>
+                    <div style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontWeight: 700,
+                      fontSize: "1.5rem",
+                      color: "#ff2d4b",
+                    }}>{mission.probabilityDelta.from}%</div>
                   </div>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button onClick={() => setActiveOverlay("checkin")} className="action-button">
-                  Manual Check-in
-                </button>
-                <button onClick={finishMission} disabled={isActing} className="action-button border-kill text-kill disabled:opacity-40">
-                  End Mission
-                </button>
+                  <div style={{ color: "#2a3a4a", fontSize: "1.25rem" }}>→</div>
+                  <div>
+                    <div className="label-xs" style={{ marginBottom: "0.2rem" }}>WITH THIS PLAN</div>
+                    <div style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontWeight: 700,
+                      fontSize: "1.5rem",
+                      color: "#00d4ff",
+                    }}>{mission.probabilityDelta.to}% ↑</div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                {mission.plan.map((block, i) => {
+                  const isDone = i < mission.currentTaskIndex;
+                  const isActive = i === mission.currentTaskIndex;
+                  return (
+                    <div key={`${block}-${i}`} className={`plan-block animate-in ${isActive ? "active" : isDone ? "done" : ""}`}>
+                      {block}
+                    </div>
+                  );
+                })}
               </div>
             </Panel>
           )}
 
+          {/* Mission Debrief */}
           {mission.finalDebrief && (
-            <Panel title="MISSION DEBRIEF" danger>
-              <div className="grid gap-3 font-mono text-lg animate-fade-in">
-                <h3 className="mb-2 text-2xl font-black uppercase text-white">Mission Result</h3>
-                <div className="grid grid-cols-2 gap-4 border-b border-white/10 pb-4 text-sm text-zinc-300">
-                  <p><span className="block text-xs uppercase text-zinc-500">Completed</span> {mission.finalDebrief.completed}/{mission.finalDebrief.total}</p>
-                  <p><span className="block text-xs uppercase text-zinc-500">Dropped</span> {mission.finalDebrief.dropped}</p>
-                  <p><span className="block text-xs uppercase text-zinc-500">Time Remaining</span> {mission.finalDebrief.timeRemaining} min</p>
+            <Panel title="MISSION DEBRIEF" variant="threat">
+              <div className="animate-in">
+                <div style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "1.4rem",
+                  marginBottom: "1.25rem",
+                  color: "#fff",
+                }}>
+                  MISSION RESULT
                 </div>
-                <div className="grid grid-cols-2 gap-4 border-b border-white/10 pb-4 text-sm text-zinc-300">
-                  <p><span className="block text-xs uppercase text-zinc-500">Original Probability</span> {mission.finalDebrief.originalProbability}%</p>
-                  <p><span className="block text-xs uppercase text-zinc-500">Final Probability</span> {mission.finalDebrief.finalProbability}%</p>
+
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: "1rem",
+                  marginBottom: "1rem",
+                  paddingBottom: "1rem",
+                  borderBottom: "1px solid #131920",
+                }}>
+                  {[
+                    { label: "COMPLETED", val: `${mission.finalDebrief.completed}/${mission.finalDebrief.total}` },
+                    { label: "DROPPED", val: mission.finalDebrief.dropped },
+                    { label: "TIME LEFT", val: `${mission.finalDebrief.timeRemaining}m` },
+                  ].map(({ label, val }) => (
+                    <div key={label}>
+                      <div className="label-xs" style={{ marginBottom: "0.3rem" }}>{label}</div>
+                      <div style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 700,
+                        fontSize: "1.5rem",
+                        color: "#fff",
+                      }}>{val}</div>
+                    </div>
+                  ))}
                 </div>
-                <div className="pt-2">
-                  <p className="mb-1 text-xs font-black uppercase tracking-widest text-signal">Critical Decision</p>
-                  <p className="text-white">{mission.finalDebrief.criticalDecision}</p>
+
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "1rem",
+                  marginBottom: "1rem",
+                  paddingBottom: "1rem",
+                  borderBottom: "1px solid #131920",
+                }}>
+                  <div>
+                    <div className="label-xs" style={{ marginBottom: "0.3rem" }}>ORIGINAL ODDS</div>
+                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: "1.4rem", color: "#ff2d4b" }}>
+                      {mission.finalDebrief.originalProbability}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="label-xs" style={{ marginBottom: "0.3rem" }}>FINAL ODDS</div>
+                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: "1.4rem", color: "#00d4ff" }}>
+                      {mission.finalDebrief.finalProbability}%
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label-threat" style={{ marginBottom: "0.5rem" }}>CRITICAL DECISION</div>
+                  <p style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: "0.85rem",
+                    color: "#fff",
+                    lineHeight: 1.6,
+                  }}>{mission.finalDebrief.criticalDecision}</p>
                 </div>
               </div>
             </Panel>
           )}
         </div>
 
-        <aside className="space-y-4">
-          <Panel title="Probability Board">
-            <div className="flex items-end justify-between gap-3">
-              <p className="text-7xl font-black text-signal transition-all duration-500">{mission.probability ?? "--"}%</p>
-              <p className="pb-2 text-right font-mono text-xs uppercase text-zinc-500">
-                Updated after every major state change
-              </p>
+        {/* RIGHT SIDEBAR */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+          {/* Probability Board */}
+          <Panel title="LIVE PROBABILITY" variant="default">
+            <div style={{ marginBottom: "1rem" }}>
+              <div className={`prob-number ${probClass(mission.probability)}`}>
+                {mission.probability ?? "--"}
+                <span style={{ fontSize: "2rem", color: "#2a3a4a" }}>%</span>
+              </div>
             </div>
-            <div className="mt-4 space-y-3 font-mono text-sm text-zinc-300">
-              <div className="border-l-2 border-kill/50 pl-3 animate-fade-in">
-                <p className="text-xs font-black uppercase text-kill">Biggest Risk</p>
-                <p>{mission.biggestRisk || "Awaiting verdict."}</p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+              <div style={{ borderLeft: "2px solid rgba(255,45,75,0.4)", paddingLeft: "0.75rem" }}>
+                <div className="label-xs" style={{ color: "#ff2d4b", marginBottom: "0.25rem" }}>BIGGEST RISK</div>
+                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem", color: "#8b9ab0", lineHeight: 1.5, margin: 0 }}>
+                  {mission.biggestRisk || "Awaiting analysis"}
+                </p>
               </div>
-              <div className="border-l-2 border-signal/50 pl-3 animate-fade-in">
-                <p className="text-xs font-black uppercase text-signal">Highest Leverage Task</p>
-                <p>{mission.mostValuableTask || "Awaiting target."}</p>
+              <div style={{ borderLeft: "2px solid rgba(0,212,255,0.4)", paddingLeft: "0.75rem" }}>
+                <div className="label-xs" style={{ color: "#00d4ff", marginBottom: "0.25rem" }}>HIGHEST LEVERAGE</div>
+                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.75rem", color: "#8b9ab0", lineHeight: 1.5, margin: 0 }}>
+                  {mission.mostValuableTask || "Awaiting target"}
+                </p>
               </div>
-              {mission.probabilityReasoning && (
-                <div className="border-l-2 border-white/20 pl-3 animate-fade-in">
-                  <p className="text-xs font-black uppercase text-white">Reasoning</p>
-                  <p>{mission.probabilityReasoning}</p>
-                </div>
-              )}
             </div>
           </Panel>
 
-          <Panel title="Agent Timeline">
-            <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-2 font-mono text-sm">
-              {mission.timeline?.map((item, index) => (
-                <div key={index} className="flex gap-3 animate-fade-in text-zinc-300">
-                  <span className="text-signal">{item.startsWith("✓") ? item.charAt(0) : "→"}</span>
-                  <span className={item.startsWith("✓") ? "text-white" : ""}>{item.startsWith("✓") ? item.substring(1).trim() : item}</span>
-                </div>
-              ))}
+          {/* Agent Timeline */}
+          <Panel title="AGENT TIMELINE" style={{ flex: 1 }}>
+            <div style={{ maxHeight: "360px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {(mission.timeline || []).map((item, i) => {
+                const isDone = item.startsWith("✓");
+                const isActive = item.includes("Running") || item.includes("Generating");
+                return (
+                  <div key={i} className={`timeline-item animate-in ${isDone ? "done" : isActive ? "active" : ""}`}>
+                    <span style={{ flexShrink: 0, marginTop: "1px" }}>
+                      {isDone ? "✓" : "→"}
+                    </span>
+                    <span>{isDone ? item.substring(1).trim() : item}</span>
+                  </div>
+                );
+              })}
               <div ref={feedEndRef} />
               {isActing && !missionError && (
-                <div className="flex gap-3 animate-pulse text-zinc-500">
-                  <span className="text-signal">...</span>
+                <div className="timeline-item active" style={{ animation: "none", opacity: 0.6 }}>
+                  <span>···</span>
                   <span>Processing...</span>
                 </div>
               )}
             </div>
           </Panel>
-        </aside>
-      </section>
 
+          {/* Reset */}
+          <button
+            className="btn-ghost"
+            style={{ width: "100%" }}
+            onClick={() => {
+              localStorage.removeItem(STORAGE_KEY);
+              localStorage.removeItem("limitbreaker-session-id");
+              setMission(emptyMission);
+              setSituation("");
+              setMissionError(null);
+            }}
+          >
+            ← New Mission
+          </button>
+        </div>
+      </div>
+
+      {/* Check-in overlay */}
       {activeOverlay === "checkin" && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-black/80 p-4 backdrop-blur animate-fade-in">
-          <div className="w-full max-w-xl border border-signal bg-armor p-6 shadow-hostile">
-            <p className="font-mono text-xs uppercase tracking-[0.35em] text-signal">
-              Progress Check-in
-            </p>
-            <h2 className="mt-3 text-3xl font-black uppercase">Did you finish this?</h2>
-            <p className="mt-3 border-l-4 border-signal pl-4 font-mono text-zinc-300">
+        <div className="overlay-backdrop animate-in">
+          <div style={{
+            background: "#0d1117",
+            border: "1px solid rgba(0,212,255,0.25)",
+            padding: "2rem",
+            maxWidth: "480px",
+            width: "100%",
+            boxShadow: "0 0 0 1px rgba(0,212,255,0.08), 0 32px 80px rgba(0,0,0,0.6)",
+          }}>
+            <div className="label-operative" style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "0.65rem",
+              fontWeight: 700,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "#00d4ff",
+              marginBottom: "0.75rem",
+            }}>PROGRESS CHECK-IN</div>
+
+            <h2 style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: "1.4rem",
+              marginBottom: "1rem",
+              color: "#fff",
+            }}>Did you finish this task?</h2>
+
+            <div style={{
+              background: "rgba(0,212,255,0.04)",
+              border: "1px solid rgba(0,212,255,0.12)",
+              borderLeft: "3px solid #00d4ff",
+              padding: "0.875rem 1rem",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "0.8rem",
+              color: "#8b9ab0",
+              marginBottom: "1.5rem",
+              lineHeight: 1.5,
+            }}>
               {currentBlock || "Current task"}
-            </p>
-            <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <button onClick={() => handleCheckIn("DONE")} disabled={isActing} className="action-button disabled:opacity-40">✅ DONE</button>
-              <button onClick={() => handleCheckIn("PARTIAL")} disabled={isActing} className="action-button disabled:opacity-40">⚠️ PARTIAL</button>
-              <button onClick={() => handleCheckIn("BEHIND")} disabled={isActing} className="action-button border-kill text-kill disabled:opacity-40">❌ BEHIND</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.625rem" }}>
+              <button className="btn-operative" disabled={isActing} onClick={() => handleCheckIn("DONE")}>
+                ✓ DONE
+              </button>
+              <button className="btn-ghost" disabled={isActing} onClick={() => handleCheckIn("PARTIAL")}>
+                ⚡ PARTIAL
+              </button>
+              <button className="btn-threat" disabled={isActing} onClick={() => handleCheckIn("BEHIND")}>
+                ✕ BEHIND
+              </button>
             </div>
           </div>
         </div>
       )}
-    </main>
-  );
-}
 
-function Panel({ title, danger = false, children }) {
-  return (
-    <section className={`border bg-armor/90 p-4 shadow-hostile animate-fade-in ${danger ? "border-kill/50" : "border-white/10"}`}>
-      <h2 className={`mb-4 font-mono text-sm font-black uppercase tracking-[0.25em] ${danger ? "text-kill" : "text-signal"}`}>
-        {title}
-      </h2>
-      {children}
-    </section>
+      <style>{`
+        @media(max-width: 768px) {
+          .mission-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+    </div>
   );
 }
 
