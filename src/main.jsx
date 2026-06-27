@@ -179,12 +179,12 @@ function App() {
       try {
         const response = await ai.models.generateContent({
           model: GEMINI_MODEL,
-          contents: \`\${HARD_PERSONALITY}\n\${prompt}\`,
+          contents: `${HARD_PERSONALITY}\n${prompt}`,
         });
         const text = response.text || "";
         return parser(text);
       } catch (error) {
-        throw new Error(\`[\${agent}] \${error.message}\`);
+        throw new Error(`[${agent}] ${error.message}`);
       }
     },
     [ai],
@@ -194,7 +194,7 @@ function App() {
     async (baseMission) => {
       const result = await callGemini(
         "PROBABILITY ENGINE",
-        \`Given these remaining tasks and this time remaining, output only JSON:
+        `Given these remaining tasks and this time remaining, output only JSON:
 {
   "probability": number,
   "biggest_risk": string,
@@ -202,8 +202,8 @@ function App() {
   "reasoning": string
 }
 Probability is 0-100. Be realistic, not optimistic.
-Remaining minutes: \${Math.ceil(baseMission.remainingSeconds / 60)}
-Tasks: \${JSON.stringify(baseMission.triage.filter((task) => task.classification !== "DROP"))}\`,
+Remaining minutes: ${Math.ceil(baseMission.remainingSeconds / 60)}
+Tasks: ${JSON.stringify(baseMission.triage.filter((task) => task.classification !== "DROP"))}`,
       );
 
       return {
@@ -242,19 +242,19 @@ Tasks: \${JSON.stringify(baseMission.triage.filter((task) => task.classification
 
       const codenameData = await callGemini(
         "MISSION CODENAME GENERATOR",
-        \`Read this deadline situation and output only JSON:
+        `Read this deadline situation and output only JSON:
 { "codename": "MISSION: CONTEXTUAL TWO-TO-FOUR WORD VERDICT" }
-Situation: \${input}\`,
+Situation: ${input}`,
       );
       currentMission = { ...currentMission, codename: codenameData.codename, phase: "initial" };
       writeMission(currentMission);
 
       const initialData = await callGemini(
         "INITIAL ODDS ASSESSOR",
-        \`Before any triage, calculate the user's chance without intervention. Output only JSON:
+        `Before any triage, calculate the user's chance without intervention. Output only JSON:
 { "initial_probability": number, "reasoning": string }
 The number must feel alarming.
-Situation: \${input}\`,
+Situation: ${input}`,
       );
       currentMission = {
         ...currentMission,
@@ -269,7 +269,7 @@ Situation: \${input}\`,
 
       const triage = await callGemini(
         "TRIAGE AGENT",
-        \`You are a brutal deadline triage agent. The user is out of time. Classify every task mentioned as:
+        `You are a brutal deadline triage agent. The user is out of time. Classify every task mentioned as:
 CRITICAL — must be done, no shortcuts
 SIMPLIFY — do a shortened version
 DROP — eliminate entirely
@@ -279,7 +279,7 @@ Output only a JSON array:
   { "task": string, "classification": "CRITICAL" | "SIMPLIFY" | "DROP", "reasoning": string, "time_saved_minutes": number, "impact_lost": "Low" | "Medium" | "High" | null }
 ]
 Set time_saved_minutes to 0 unless classification is DROP.
-Situation: \${input}\`,
+Situation: ${input}`,
         extractJsonArray,
       );
       const dropped = triage.filter((task) => task.classification === "DROP");
@@ -291,11 +291,11 @@ Situation: \${input}\`,
 
       const questions = await callGemini(
         "REALITY CHECK AGENT",
-        \`Ask the user maximum 2 yes/no questions. Choose only questions whose answers would change the plan significantly. Do not ask obvious questions. Do not ask more than 2.
+        `Ask the user maximum 2 yes/no questions. Choose only questions whose answers would change the plan significantly. Do not ask obvious questions. Do not ask more than 2.
 Output only JSON:
 { "questions": [{ "id": "q1", "question": string }, { "id": "q2", "question": string }] }
-Situation: \${input}
-Current triage: \${JSON.stringify(triage)}\`,
+Situation: ${input}
+Current triage: ${JSON.stringify(triage)}`,
       );
       currentMission = { ...currentMission, questions: questions.questions ?? [], phase: "questions" };
       writeMission(currentMission);
@@ -325,19 +325,19 @@ Current triage: \${JSON.stringify(triage)}\`,
 
       const adjusted = await callGemini(
         "REALITY CHECK AGENT",
-        \`Given the yes/no answers, adjust triage only if needed, then lock the plan. Output only a JSON array:
+        `Given the yes/no answers, adjust triage only if needed, then lock the plan. Output only a JSON array:
 [
   { "task": string, "classification": "CRITICAL" | "SIMPLIFY" | "DROP", "reasoning": string, "time_saved_minutes": number, "impact_lost": "Low" | "Medium" | "High" | null }
 ]
-Situation: \${mission.situation}
-Original triage: \${JSON.stringify(mission.triage)}
-Answers: \${JSON.stringify(mission.answers)}\`,
+Situation: ${mission.situation}
+Original triage: ${JSON.stringify(mission.triage)}
+Answers: ${JSON.stringify(mission.answers)}`,
         extractJsonArray,
       );
 
       const planData = await callGemini(
         "RESCUE COMMAND",
-        \`Given the surviving tasks (CRITICAL + SIMPLIFY adjusted tasks) and remaining time in minutes, generate a minute-by-minute schedule. Assign exact time blocks. Add 5-minute transition buffers. If tasks exceed available time, cut the lowest priority surviving task and state this explicitly.
+        `Given the surviving tasks (CRITICAL + SIMPLIFY adjusted tasks) and remaining time in minutes, generate a minute-by-minute schedule. Assign exact time blocks. Add 5-minute transition buffers. If tasks exceed available time, cut the lowest priority surviving task and state this explicitly.
 Output only JSON:
 {
   "plan": ["[TIME BLOCK] → [TASK] ([duration] min)"],
@@ -347,8 +347,8 @@ Output only JSON:
   "most_valuable_task": string,
   "reasoning": string
 }
-Remaining minutes: \${mission.deadlineMinutes}
-Adjusted triage: \${JSON.stringify(adjusted)}\`,
+Remaining minutes: ${mission.deadlineMinutes}
+Adjusted triage: ${JSON.stringify(adjusted)}`,
       );
 
       const next = {
@@ -393,16 +393,16 @@ Adjusted triage: \${JSON.stringify(adjusted)}\`,
       );
       const result = await callGemini(
         "REPLANNING AGENT",
-        \`The user is behind. Re-run triage on ONLY remaining incomplete tasks with ONLY remaining time available. Be MORE aggressive with cuts than the original plan. Tell the user exactly what just got cut due to the delay. Output a new schedule immediately. No sympathy. No explanation of why this happened. Just the new plan.
+        `The user is behind. Re-run triage on ONLY remaining incomplete tasks with ONLY remaining time available. Be MORE aggressive with cuts than the original plan. Tell the user exactly what just got cut due to the delay. Output a new schedule immediately. No sympathy. No explanation of why this happened. Just the new plan.
 Output only JSON:
 {
   "message": "PLAN UPDATED. [Task X] has been eliminated.",
   "triage": [{ "task": string, "classification": "CRITICAL" | "SIMPLIFY" | "DROP", "reasoning": string, "time_saved_minutes": number, "impact_lost": "Low" | "Medium" | "High" | null }],
   "plan": ["[TIME BLOCK] → [TASK] ([duration] min)"]
 }
-Check-in status: \${status}
-Remaining minutes: \${Math.ceil(mission.remainingSeconds / 60)}
-Remaining incomplete tasks: \${JSON.stringify(incompleteTasks)}\`,
+Check-in status: ${status}
+Remaining minutes: ${Math.ceil(mission.remainingSeconds / 60)}
+Remaining incomplete tasks: ${JSON.stringify(incompleteTasks)}`,
       );
 
       let nextMission = {
@@ -414,7 +414,7 @@ Remaining incomplete tasks: \${JSON.stringify(incompleteTasks)}\`,
       };
       
       nextMission = await updateProbability(nextMission);
-      nextMission.timeline = [...(nextMission.timeline || []), \`REPLANNING AGENT: \${result.message}\`, "✓ Rescue Plan Updated"];
+      nextMission.timeline = [...(nextMission.timeline || []), `REPLANNING AGENT: ${result.message}`, "✓ Rescue Plan Updated"];
       writeMission(nextMission);
     } catch (error) {
       setMissionError(error.message);
@@ -448,7 +448,7 @@ Remaining incomplete tasks: \${JSON.stringify(incompleteTasks)}\`,
 
     try {
       nextMission = await updateProbability(nextMission);
-      nextMission.timeline = [...(nextMission.timeline || []), \`Progress Update: \${status}\`, "✓ Probabilities Updated"];
+      nextMission.timeline = [...(nextMission.timeline || []), `Progress Update: ${status}`, "✓ Probabilities Updated"];
     } catch (error) {
       setMissionError(error.message);
       return; // Do not advance if probability update fails
@@ -464,12 +464,12 @@ Remaining incomplete tasks: \${JSON.stringify(incompleteTasks)}\`,
       pushTimeline("Generating MISSION DEBRIEF...");
       const criticalDecision = await callGemini(
         "MISSION DEBRIEF",
-        \`Generate one sentence on the most impactful cut made during the session. Output only JSON:
+        `Generate one sentence on the most impactful cut made during the session. Output only JSON:
 { "critical_decision": string }
-Dropped tasks: \${JSON.stringify(mission.dropped)}
-Completed tasks: \${JSON.stringify(mission.completedTasks)}
-Original probability: \${mission.initialProbability}
-Final probability: \${mission.probability}\`,
+Dropped tasks: ${JSON.stringify(mission.dropped)}
+Completed tasks: ${JSON.stringify(mission.completedTasks)}
+Original probability: ${mission.initialProbability}
+Final probability: ${mission.probability}`,
       );
       writeMission({
         ...mission,
@@ -598,7 +598,7 @@ Final probability: \${mission.probability}\`,
               <p className="text-xs uppercase text-zinc-500">Success Probability</p>
               <p className="text-2xl font-black text-signal transition-all duration-500">{mission.probability ?? "--"}%</p>
             </div>
-            <div className={\`border bg-black/60 px-4 py-2 text-right font-mono transition-colors duration-500 \${timerTone(mission.remainingSeconds)}\`}>
+            <div className={`border bg-black/60 px-4 py-2 text-right font-mono transition-colors duration-500 ${timerTone(mission.remainingSeconds)}`}>
               <p className="text-xs uppercase text-zinc-500">Clock</p>
               <p className="text-2xl font-black">{formatClock(mission.remainingSeconds)}</p>
             </div>
@@ -648,7 +648,7 @@ Final probability: \${mission.probability}\`,
             <Panel title="TRIAGE AGENT">
               <div className="grid gap-3">
                 {mission.triage.filter(t => t.classification !== "DROP").map((task) => (
-                  <article key={\`\${task.task}-\${task.classification}\`} className={\`border p-4 animate-fade-in \${classTone(task.classification)}\`}>
+                  <article key={`${task.task}-${task.classification}`} className={`border p-4 animate-fade-in ${classTone(task.classification)}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h3 className="font-black uppercase">{task.task}</h3>
                       <span className="font-mono text-xs font-black">{task.classification}</span>
@@ -664,7 +664,7 @@ Final probability: \${mission.probability}\`,
             <Panel title="Sacrifice Report" danger>
               <div className="space-y-3">
                 {mission.dropped.map((task) => (
-                  <div key={\`drop-\${task.task}\`} className="border border-kill/50 bg-kill/10 p-4 animate-fade-in">
+                  <div key={`drop-${task.task}`} className="border border-kill/50 bg-kill/10 p-4 animate-fade-in">
                     <p className="font-black text-kill">❌ {task.task}</p>
                     <div className="mt-2 grid grid-cols-2 gap-2 border-l-2 border-kill/30 pl-3 font-mono text-sm text-zinc-300">
                       <p><span className="text-zinc-500">Time Saved:</span> {task.time_saved_minutes || "--"} min</p>
@@ -714,12 +714,12 @@ Final probability: \${mission.probability}\`,
               <div className="space-y-2">
                 {mission.plan.map((block, index) => (
                   <div
-                    key={\`\${block}-\${index}\`}
-                    className={\`border p-3 font-mono text-sm animate-fade-in \${
+                    key={`${block}-${index}`}
+                    className={`border p-3 font-mono text-sm animate-fade-in ${
                       index === mission.currentTaskIndex
                         ? "border-signal bg-signal/10 text-white"
                         : "border-white/10 bg-black/30 text-zinc-300"
-                    }\`}
+                    }`}
                   >
                     {block}
                   </div>
@@ -828,8 +828,8 @@ Final probability: \${mission.probability}\`,
 
 function Panel({ title, danger = false, children }) {
   return (
-    <section className={\`border bg-armor/90 p-4 shadow-hostile animate-fade-in \${danger ? "border-kill/50" : "border-white/10"}\`}>
-      <h2 className={\`mb-4 font-mono text-sm font-black uppercase tracking-[0.25em] \${danger ? "text-kill" : "text-signal"}\`}>
+    <section className={`border bg-armor/90 p-4 shadow-hostile animate-fade-in ${danger ? "border-kill/50" : "border-white/10"}`}>
+      <h2 className={`mb-4 font-mono text-sm font-black uppercase tracking-[0.25em] ${danger ? "text-kill" : "text-signal"}`}>
         {title}
       </h2>
       {children}
