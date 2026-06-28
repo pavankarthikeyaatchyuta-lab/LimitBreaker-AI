@@ -1,5 +1,7 @@
 require("./viteSandboxPatch.cjs");
 
+(process.env.VITE_GEMINI_API_KEY ||= process.env.GEMINI_API_KEY || "");
+
 (async () => {
   const { createServer } = await import("vite");
   const hostIndex = process.argv.indexOf("--host");

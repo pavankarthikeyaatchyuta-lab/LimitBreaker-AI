@@ -17,11 +17,9 @@ Open the Vite URL shown in the terminal.
 
 ## Environment
 
-Create `.env.local` from `.env.example`.
+For local development, you can create `.env.local` from `.env.example`, or set `GEMINI_API_KEY` in your shell before running `npm run dev`.
 
-```bash
-VITE_GEMINI_API_KEY=your_google_ai_studio_key
-```
+For deployment, set `GEMINI_API_KEY` or `VITE_GEMINI_API_KEY` in the environment before running `npm run build`. The build script maps `GEMINI_API_KEY` into Vite automatically.
 
 Firebase is optional for local testing. If the Firebase variables are blank, sessions persist in `localStorage`. When Firebase config is provided, the app also writes session state to Firestore at:
 
