@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "firebase/app";
@@ -84,6 +84,29 @@ function extractJsonArray(text) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
+function normalizeAgentError(agent, error) {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const lowerMessage = rawMessage.toLowerCase();
+
+  if (lowerMessage.includes("quota") || lowerMessage.includes("resource_exhausted") || lowerMessage.includes("429")) {
+    return "[" + agent + "] Gemini quota exceeded. Retry after the rate limit resets or use a fresh API key.";
+  }
+
+  if (lowerMessage.includes("api key") || lowerMessage.includes("unauthorized") || lowerMessage.includes("401")) {
+    return "[" + agent + "] Gemini authentication failed. Check the API key in .env.local.";
+  }
+
+  if (lowerMessage.includes("failed to fetch") || lowerMessage.includes("network") || lowerMessage.includes("fetch")) {
+    return "[" + agent + "] Network error reaching Gemini. Check connectivity and try again.";
+  }
+
+  if (rawMessage.startsWith("[") && rawMessage.includes("]")) {
+    return rawMessage;
+  }
+
+  const firstLine = rawMessage.split(/\r?\n/)[0].trim();
+  return firstLine.length > 220 ? firstLine.slice(0, 217) + "..." : firstLine;
+}
 function formatClock(seconds) {
   const safeSeconds = Math.max(0, seconds);
   const hours = Math.floor(safeSeconds / 3600);
@@ -128,10 +151,6 @@ function minutesFromSituation(situation) {
   return total > 0 ? Math.min(total, 24 * 60) : 120;
 }
 
-function parsePlanBlock(block) {
-  const match = block.match(/\((\d+)\s*min/i);
-  return match ? Number(match[1]) : 20;
-}
 
 async function persistMission(mission) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(mission));
@@ -154,10 +173,12 @@ function useGemini() {
   }, []);
 }
 
-// ─── INTAKE SCREEN ───────────────────────────────────────────────────────────
-function IntakeScreen({ situation, setSituation, onActivate, isActing, error }) {
+// --- INTAKE SCREEN -----------------------------------------------------------
+function IntakeScreen({ situation, setSituation, onActivate, isActing, error, pointer, viewport }) {
   return (
-    <main className="min-h-screen" style={{ background: "#080a0c" }}>
+    <main className="app-shell app-shell-intake min-h-screen">
+      <BackgroundScene pointer={pointer} viewport={viewport} />
+      <CursorOrb pointer={pointer} />
       {/* Top bar */}
       <div style={{
         borderBottom: "1px solid #1e2a36",
@@ -249,7 +270,7 @@ function IntakeScreen({ situation, setSituation, onActivate, isActing, error }) 
             marginTop: "0.5rem",
             marginBottom: "1rem"
           }}>
-            <span className="label-xs">⌘↵ to activate</span>
+            <span className="label-xs">Ctrl+Enter to activate</span>
             <span className="label-xs">{situation.length} chars</span>
           </div>
 
@@ -259,7 +280,7 @@ function IntakeScreen({ situation, setSituation, onActivate, isActing, error }) 
             onClick={onActivate}
             disabled={isActing || !situation.trim()}
           >
-            {isActing ? "INITIALIZING TRIAGE SYSTEM..." : "ACTIVATE LIMITBREAKER →"}
+            {isActing ? "INITIALIZING TRIAGE SYSTEM..." : "Activate LimitBreaker"}
           </button>
         </div>
 
@@ -290,7 +311,7 @@ function IntakeScreen({ situation, setSituation, onActivate, isActing, error }) 
   );
 }
 
-// ─── MISSION HEADER ───────────────────────────────────────────────────────────
+// --- MISSION HEADER -----------------------------------------------------------
 function MissionHeader({ mission, onCheckin, onEndMission, isActing }) {
   const tc = timerClass(mission.remainingSeconds);
   const pc = probClass(mission.probability);
@@ -392,44 +413,94 @@ function MissionHeader({ mission, onCheckin, onEndMission, isActing }) {
   );
 }
 
-// ─── PANEL COMPONENT ──────────────────────────────────────────────────────────
+// --- PANEL COMPONENT ----------------------------------------------------------
 function Panel({ title, variant = "default", tag, children, style = {} }) {
-  const borderMap = {
-    default: "1px solid #1e2a36",
-    threat: "1px solid rgba(255,45,75,0.25)",
-    operative: "1px solid rgba(0,212,255,0.2)",
-  };
-  const labelColorMap = {
-    default: "#4a5a6a",
-    threat: "#ff2d4b",
-    operative: "#00d4ff",
-  };
-
   return (
-    <section className="animate-in" style={{
-      background: "#0d1117",
-      border: borderMap[variant],
-      padding: "1.25rem",
-      boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.35)",
-      ...style
-    }}>
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: "1rem",
-        paddingBottom: "0.75rem",
-        borderBottom: "1px solid #131920",
-      }}>
-        <span className="label-xs" style={{ color: labelColorMap[variant] }}>{title}</span>
-        {tag && <span className="badge badge-critical">{tag}</span>}
+    <section className={`panel panel-${variant} animate-in`} style={style}>
+      <div className="panel-head">
+        <div>
+          <div className={`panel-kicker panel-kicker-${variant}`}>{title}</div>
+          {tag && <div className="panel-tag">{tag}</div>}
+        </div>
       </div>
-      {children}
+      <div className="panel-content">{children}</div>
     </section>
   );
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function BackgroundScene({ pointer, viewport }) {
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height / 2;
+  const driftX = (pointer.x - centerX) * -0.03;
+  const driftY = (pointer.y - centerY) * -0.03;
+  const trailX = (pointer.x - centerX) * 0.08;
+  const trailY = (pointer.y - centerY) * 0.08;
+  const activeOpacity = pointer.active ? 0.85 : 0.55;
+  const glowSize = pointer.active ? 620 : 460;
+
+  return (
+    <div className="background-scene" aria-hidden="true">
+      <div
+        className="scene-layer scene-stars"
+        style={{
+          transform: `translate3d(${driftX}px, ${driftY}px, 0)`,
+          opacity: pointer.active ? 0.9 : 0.72,
+        }}
+      />
+      <div
+        className="scene-layer scene-nebula scene-nebula-primary"
+        style={{
+          left: `${pointer.x}px`,
+          top: `${pointer.y}px`,
+          width: `${glowSize}px`,
+          height: `${glowSize}px`,
+          opacity: activeOpacity,
+        }}
+      />
+      <div
+        className="scene-layer scene-nebula scene-nebula-secondary"
+        style={{
+          left: `${pointer.x + trailX}px`,
+          top: `${pointer.y + trailY}px`,
+          width: `${glowSize * 0.7}px`,
+          height: `${glowSize * 0.7}px`,
+          opacity: pointer.active ? 0.55 : 0.35,
+        }}
+      />
+      <div
+        className="scene-layer scene-rings"
+        style={{
+          transform: `translate3d(${trailX}px, ${trailY}px, 0) rotate(${pointer.x / 30}deg)`,
+          opacity: pointer.active ? 0.55 : 0.35,
+        }}
+      />
+      <div
+        className="scene-layer scene-depth"
+        style={{
+          transform: `translate3d(${trailX * 1.5}px, ${trailY * 1.5}px, 0)`,
+        }}
+      />
+    </div>
+  );
+}
+
+function CursorOrb({ pointer }) {
+  return (
+    <div
+      className={`cursor-orb cursor-${pointer.kind} ${pointer.active ? "is-active" : ""} ${pointer.pressed ? "is-pressed" : ""}`}
+      style={{
+        transform: `translate3d(${pointer.x}px, ${pointer.y}px, 0) translate(-50%, -50%)`,
+        opacity: pointer.visible ? 1 : 0,
+      }}
+    >
+      <span className="cursor-core" />
+      <span className="cursor-ring" />
+      <span className="cursor-tail" />
+    </div>
+  );
+}
+
+// --- MAIN APP -----------------------------------------------------------------
 function App() {
   const ai = useGemini();
   const [mission, setMission] = useState(() => {
@@ -440,6 +511,18 @@ function App() {
   const [isActing, setIsActing] = useState(false);
   const [activeOverlay, setActiveOverlay] = useState(null);
   const [missionError, setMissionError] = useState(null);
+  const [pointer, setPointer] = useState({
+    x: 0,
+    y: 0,
+    active: false,
+    visible: false,
+    pressed: false,
+    kind: "default",
+  });
+  const [viewport, setViewport] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   const feedEndRef = useRef(null);
   const debriefRequestedRef = useRef(false);
 
@@ -468,9 +551,77 @@ function App() {
       const text = response.text || "";
       return parser(text);
     } catch (error) {
-      throw new Error(`[${agent}] ${error.message}`);
+      throw new Error(normalizeAgentError(agent, error));
     }
   }, [ai]);
+
+  useEffect(() => {
+    const updatePointerKind = (target) => {
+      if (!(target instanceof Element)) return "default";
+      if (target.closest("button, [role='button'], .btn-primary, .btn-ghost, .btn-threat, .btn-operative")) {
+        if (target.closest(".btn-threat")) return "danger";
+        if (target.closest(".btn-operative")) return "operative";
+        return "button";
+      }
+      if (target.closest("textarea, input")) return "text";
+      if (target.closest("a")) return "link";
+      return "default";
+    };
+
+    const handleMove = (event) => {
+      setPointer((current) => ({
+        ...current,
+        x: event.clientX,
+        y: event.clientY,
+        visible: true,
+        active: true,
+        kind: updatePointerKind(event.target),
+      }));
+    };
+
+    const handleLeave = () => {
+      setPointer((current) => ({
+        ...current,
+        active: false,
+        visible: false,
+      }));
+    };
+
+    const handleDown = (event) => {
+      setPointer((current) => ({
+        ...current,
+        pressed: true,
+        kind: updatePointerKind(event.target),
+      }));
+    };
+
+    const handleUp = () => {
+      setPointer((current) => ({
+        ...current,
+        pressed: false,
+      }));
+    };
+
+    const handleResize = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerleave", handleLeave);
+    window.addEventListener("pointerdown", handleDown);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("blur", handleLeave);
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerleave", handleLeave);
+      window.removeEventListener("pointerdown", handleDown);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("blur", handleLeave);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const updateProbability = useCallback(async (baseMission) => {
     const result = await callGemini(
@@ -561,7 +712,7 @@ Situation: ${input}`,
       const dropped = triage.filter((t) => t.classification === "DROP");
       currentMission = { ...currentMission, triage, dropped, phase: "questions" };
       writeMission(currentMission);
-      pushTimeline("✓ Triage Complete");
+      pushTimeline("* Triage Complete");
       pushTimeline("Running REALITY CHECK...");
 
       const questions = await callGemini(
@@ -594,7 +745,7 @@ Current triage: ${JSON.stringify(triage)}`,
     setIsActing(true);
     setMissionError(null);
     try {
-      pushTimeline("✓ Reality Check Complete");
+      pushTimeline("* Reality Check Complete");
       pushTimeline("Evaluating sacrifices & generating RESCUE COMMAND...");
 
       const adjusted = await callGemini(
@@ -614,7 +765,7 @@ Answers: ${JSON.stringify(mission.answers)}`,
         `Given the surviving tasks (CRITICAL + SIMPLIFY adjusted tasks) and remaining time in minutes, generate a minute-by-minute schedule. Assign exact time blocks. Add 5-minute transition buffers. If tasks exceed available time, cut the lowest priority surviving task and state this explicitly.
 Output only JSON:
 {
-  "plan": ["[TIME BLOCK] → [TASK] ([duration] min)"],
+  "plan": ["[TIME BLOCK] ? [TASK] ([duration] min)"],
   "cut_due_to_time": string,
   "updated_probability": number,
   "biggest_risk": string,
@@ -641,7 +792,7 @@ Adjusted triage: ${JSON.stringify(adjusted)}`,
           from: mission.initialProbability,
           to: planData.updated_probability,
         },
-        timeline: [...(mission.timeline || []), "✓ Rescue Plan Locked", "✓ Mission Active"],
+        timeline: [...(mission.timeline || []), "* Rescue Plan Locked", "* Mission Active"],
       };
       writeMission(next);
     } catch (error) {
@@ -667,7 +818,7 @@ Output only JSON:
 {
   "message": "PLAN UPDATED. [Task X] has been eliminated.",
   "triage": [{ "task": string, "classification": "CRITICAL" | "SIMPLIFY" | "DROP", "reasoning": string, "time_saved_minutes": number, "impact_lost": "Low" | "Medium" | "High" | null }],
-  "plan": ["[TIME BLOCK] → [TASK] ([duration] min)"]
+  "plan": ["[TIME BLOCK] ? [TASK] ([duration] min)"]
 }
 Check-in status: ${status}
 Remaining minutes: ${Math.ceil(mission.remainingSeconds / 60)}
@@ -685,7 +836,7 @@ Remaining incomplete tasks: ${JSON.stringify(incompleteTasks)}`,
       nextMission.timeline = [
         ...(nextMission.timeline || []),
         `REPLANNING AGENT: ${result.message}`,
-        "✓ Rescue Plan Updated",
+        "? Rescue Plan Updated",
       ];
       writeMission(nextMission);
     } catch (error) {
@@ -697,7 +848,7 @@ Remaining incomplete tasks: ${JSON.stringify(incompleteTasks)}`,
 
   const handleCheckIn = async (status) => {
     const currentBlock = mission.plan[mission.currentTaskIndex] ?? "current block";
-    const currentTask = currentBlock.replace(/^\[[^\]]+\]\s*→\s*/, "").replace(/\s*\(\d+\s*min\)$/i, "");
+    const currentTask = currentBlock.replace(/^\[[^\]]+\]\s*?\s*/, "").replace(/\s*\(\d+\s*min\)$/i, "");
     setActiveOverlay(null);
 
     if (status === "BEHIND") {
@@ -721,7 +872,7 @@ Remaining incomplete tasks: ${JSON.stringify(incompleteTasks)}`,
       nextMission.timeline = [
         ...(nextMission.timeline || []),
         `Progress Update: ${status}`,
-        "✓ Probabilities Updated",
+        "? Probabilities Updated",
       ];
     } catch (error) {
       setMissionError(error.message);
@@ -758,7 +909,7 @@ Final probability: ${mission.probability}`,
           criticalDecision: criticalDecision.critical_decision,
         },
       });
-      pushTimeline("✓ Mission Concluded");
+      pushTimeline("* Mission Concluded");
     } catch (error) {
       debriefRequestedRef.current = false;
       setMissionError(error.message);
@@ -808,7 +959,7 @@ Final probability: ${mission.probability}`,
   );
   const currentBlock = mission.plan[mission.currentTaskIndex] ?? mission.plan.at(-1);
 
-  // ── INTAKE SCREEN ──
+  // -- INTAKE SCREEN --
   if (mission.phase === "intake") {
     return (
       <IntakeScreen
@@ -817,13 +968,17 @@ Final probability: ${mission.probability}`,
         onActivate={activateMission}
         isActing={isActing}
         error={missionError}
+        pointer={pointer}
+        viewport={viewport}
       />
     );
   }
 
-  // ── MISSION SCREEN ──
+  // -- MISSION SCREEN --
   return (
-    <div style={{ minHeight: "100vh", background: "#080a0c", color: "#fff" }}>
+    <div className="app-shell app-shell-mission" style={{ minHeight: "100vh", color: "#fff" }}>
+      <BackgroundScene pointer={pointer} viewport={viewport} />
+      <CursorOrb pointer={pointer} />
       <MissionHeader
         mission={mission}
         onCheckin={() => setActiveOverlay("checkin")}
@@ -851,19 +1006,19 @@ Final probability: ${mission.probability}`,
       )}
 
       {/* Main grid */}
-      <div style={{
-        maxWidth: "1200px",
+      <div className="mission-grid" style={{
+        maxWidth: "1000px",
         margin: "0 auto",
         padding: "1.25rem",
         display: "grid",
-        gridTemplateColumns: "1fr 320px",
+        gridTemplateColumns: "1fr",
         gap: "1rem",
       }}>
         {/* LEFT COLUMN */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
           {/* Situation */}
-          <Panel title="SITUATION BRIEF">
+          <Panel title="Situation brief">
             <p style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: "0.82rem",
@@ -875,7 +1030,7 @@ Final probability: ${mission.probability}`,
 
           {/* Initial probability */}
           {mission.initialProbability !== null && (
-            <Panel title="INITIAL THREAT ASSESSMENT" variant="threat">
+            <Panel title="Initial probability" variant="threat">
               <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem", marginBottom: "0.75rem" }}>
                 <span style={{
                   fontFamily: "'Space Grotesk', sans-serif",
@@ -898,7 +1053,7 @@ Final probability: ${mission.probability}`,
 
           {/* Triage */}
           {mission.triage.length > 0 && (
-            <Panel title="TRIAGE AGENT — VERDICT">
+            <Panel title="Triage verdict">
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {mission.triage.filter(t => t.classification !== "DROP").map((task) => (
                   <div key={`${task.task}-${task.classification}`}
@@ -928,7 +1083,7 @@ Final probability: ${mission.probability}`,
 
           {/* Sacrifice Report */}
           {mission.dropped.length > 0 && (
-            <Panel title="SACRIFICE REPORT — ELIMINATED" variant="threat">
+            <Panel title="Sacrifice report" variant="threat">
               <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
                 {mission.dropped.map((task) => (
                   <div key={`drop-${task.task}`} className="animate-in" style={{
@@ -937,7 +1092,7 @@ Final probability: ${mission.probability}`,
                     padding: "0.875rem 1rem",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                      <span style={{ color: "#ff2d4b", fontSize: "0.9rem" }}>✕</span>
+                      <span style={{ color: "#ff2d4b", fontSize: "0.9rem" }}>?</span>
                       <span style={{
                         fontFamily: "'Space Grotesk', sans-serif",
                         fontWeight: 600,
@@ -965,7 +1120,7 @@ Final probability: ${mission.probability}`,
 
           {/* Reality Check */}
           {mission.phase === "questions" && !missionError && (
-            <Panel title="REALITY CHECK AGENT" variant="operative">
+            <Panel title="Reality check" variant="operative">
               {unanswered.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                   {unanswered.map((q) => (
@@ -996,7 +1151,7 @@ Final probability: ${mission.probability}`,
                   onClick={lockPlan}
                   disabled={isActing}
                 >
-                  {isActing ? "GENERATING RESCUE PLAN..." : "LOCK RESCUE PLAN →"}
+                  {isActing ? "GENERATING RESCUE PLAN..." : "Lock rescue plan"}
                 </button>
               )}
             </Panel>
@@ -1004,7 +1159,7 @@ Final probability: ${mission.probability}`,
 
           {/* Rescue Plan */}
           {mission.plan.length > 0 && (
-            <Panel title="RESCUE COMMAND — LOCKED PLAN" variant="operative">
+            <Panel title="Rescue plan" variant="operative">
               {/* Probability delta */}
               {mission.probabilityDelta && (
                 <div style={{
@@ -1025,7 +1180,7 @@ Final probability: ${mission.probability}`,
                       color: "#ff2d4b",
                     }}>{mission.probabilityDelta.from}%</div>
                   </div>
-                  <div style={{ color: "#2a3a4a", fontSize: "1.25rem" }}>→</div>
+                  <div style={{ color: "#2a3a4a", fontSize: "1.25rem" }}>?</div>
                   <div>
                     <div className="label-xs" style={{ marginBottom: "0.2rem" }}>WITH THIS PLAN</div>
                     <div style={{
@@ -1033,7 +1188,7 @@ Final probability: ${mission.probability}`,
                       fontWeight: 700,
                       fontSize: "1.5rem",
                       color: "#00d4ff",
-                    }}>{mission.probabilityDelta.to}% ↑</div>
+                    }}>{mission.probabilityDelta.to}% ?</div>
                   </div>
                 </div>
               )}
@@ -1054,7 +1209,7 @@ Final probability: ${mission.probability}`,
 
           {/* Mission Debrief */}
           {mission.finalDebrief && (
-            <Panel title="MISSION DEBRIEF" variant="threat">
+            <Panel title="Mission debrief" variant="threat">
               <div className="animate-in">
                 <div style={{
                   fontFamily: "'Space Grotesk', sans-serif",
@@ -1131,7 +1286,7 @@ Final probability: ${mission.probability}`,
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
           {/* Probability Board */}
-          <Panel title="LIVE PROBABILITY" variant="default">
+          <Panel title="Command board" variant="default">
             <div style={{ marginBottom: "1rem" }}>
               <div className={`prob-number ${probClass(mission.probability)}`}>
                 {mission.probability ?? "--"}
@@ -1156,15 +1311,15 @@ Final probability: ${mission.probability}`,
           </Panel>
 
           {/* Agent Timeline */}
-          <Panel title="AGENT TIMELINE" style={{ flex: 1 }}>
+          <Panel title="Mission timeline" style={{ flex: 1 }}>
             <div style={{ maxHeight: "360px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {(mission.timeline || []).map((item, i) => {
-                const isDone = item.startsWith("✓");
+                const isDone = item.startsWith("*");
                 const isActive = item.includes("Running") || item.includes("Generating");
                 return (
                   <div key={i} className={`timeline-item animate-in ${isDone ? "done" : isActive ? "active" : ""}`}>
                     <span style={{ flexShrink: 0, marginTop: "1px" }}>
-                      {isDone ? "✓" : "→"}
+                      {isDone ? "●" : "→"}
                     </span>
                     <span>{isDone ? item.substring(1).trim() : item}</span>
                   </div>
@@ -1173,7 +1328,7 @@ Final probability: ${mission.probability}`,
               <div ref={feedEndRef} />
               {isActing && !missionError && (
                 <div className="timeline-item active" style={{ animation: "none", opacity: 0.6 }}>
-                  <span>···</span>
+                  <span>⋯</span>
                   <span>Processing...</span>
                 </div>
               )}
@@ -1192,7 +1347,7 @@ Final probability: ${mission.probability}`,
               setMissionError(null);
             }}
           >
-            ← New Mission
+            New mission
           </button>
         </div>
       </div>
@@ -1242,13 +1397,13 @@ Final probability: ${mission.probability}`,
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.625rem" }}>
               <button className="btn-operative" disabled={isActing} onClick={() => handleCheckIn("DONE")}>
-                ✓ DONE
+                DONE
               </button>
               <button className="btn-ghost" disabled={isActing} onClick={() => handleCheckIn("PARTIAL")}>
-                ⚡ PARTIAL
+                PARTIAL
               </button>
               <button className="btn-threat" disabled={isActing} onClick={() => handleCheckIn("BEHIND")}>
-                ✕ BEHIND
+                BEHIND
               </button>
             </div>
           </div>
@@ -1265,3 +1420,5 @@ Final probability: ${mission.probability}`,
 }
 
 createRoot(document.getElementById("root")).render(<App />);
+
+
