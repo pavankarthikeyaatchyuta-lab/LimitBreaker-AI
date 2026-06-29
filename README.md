@@ -1,58 +1,162 @@
 # LimitBreaker AI
 
-Emergency Deadline Triage System.
+Emergency deadline triage for when the clock is already against you.
 
-> When the clock is against you, LimitBreaker decides what survives.
+LimitBreaker AI is a single-page React app that turns a last-minute deadline dump into a ruthless survival plan: what stays, what gets simplified, what gets eliminated, and what to do next.
 
-🔴 **Live Demo:** [https://studio-4918390207-a87fa.web.app](https://studio-4918390207-a87fa.web.app)
+## Tech Stack
 
-## Run Locally
+- React + Vite
+- Tailwind CSS
+- Gemini 2.0 Flash via Google AI Studio API
+- localStorage session persistence
+- Animated canvas starfield and custom reticle cursor
+
+## Setup
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Set your Gemini API key:
+
+```env
+VITE_GEMINI_API_KEY=your_google_ai_studio_key_here
+```
+
+Run the app:
+
+```bash
 npm run dev
 ```
 
-Open the Vite URL shown in the terminal.
-
-## Environment
-
-For local development, you can create `.env.local` from `.env.example`, or set `GEMINI_API_KEY` in your shell before running `npm run dev`.
-
-For deployment, set `GEMINI_API_KEY` or `VITE_GEMINI_API_KEY` in the environment before running `npm run build`. The build script maps `GEMINI_API_KEY` into Vite automatically.
-
-Firebase is optional for local testing. If the Firebase variables are blank, sessions persist in `localStorage`. When Firebase config is provided, the app also writes session state to Firestore at:
+Open:
 
 ```text
-limitbreakerSessions/{sessionId}
+http://127.0.0.1:5173
 ```
 
-## Deploy to Firebase Hosting
+## Scripts
+
+```bash
+npm run dev
+```
+
+Starts the Vite dev server.
 
 ```bash
 npm run build
-firebase deploy
 ```
 
-`firebase.json` serves the Vite `dist` directory and rewrites all routes to `index.html`.
+Builds the production bundle into `dist/`.
 
-## 🏆 Perfect Demo Scenario (Hackathon Judging)
+```bash
+npm run preview
+```
 
-To effectively demonstrate LimitBreaker AI to a judge, use this precise scenario which guarantees a dramatic probability shift, critical triage decisions, and a high-stakes feel.
+Serves the production build locally.
 
-**Input text:**
-> Hackathon ends in 4 hours. PPT is 60% done. The README is missing entirely. Demo video not recorded yet. GitHub commit history is incomplete. Deployment is currently failing.
+## How It Works
 
-**What to highlight during the demo:**
-1. **Initial Probability**: Point out the shockingly low initial success rate to establish urgency.
-2. **Triage Agent (Sacrifice Report)**: Show how it ruthlessly drops "Demo video" and visually explains the impact lost vs time saved.
-3. **Rescue Command**: Highlight the transition to a minute-by-minute schedule.
-4. **Probability Jump**: Show how the new plan dramatically increases the success rate (e.g., 31% → 78%).
-5. **Replanning Agent**: If asked "what if I fall behind?", click the **Manual Check-in** button and select **❌ BEHIND**. Show the agent immediately cutting another task and updating the schedule without sympathy.
-6. **Mission Debrief**: Conclude the demo by ending the mission and showing the one-sentence "Critical Decision".
+1. User describes the emergency deadline.
+2. The app parses deadline text such as `4 hours`, `90 minutes`, or `at 5:30pm`.
+3. Gemini agents generate the mission plan using a reduced-call pipeline:
+   - Call 1: mission codename, triage classifications, scope reductions, and sacrifice report
+   - Call 2: reality-check questions
+   - Call 3: rescue schedule and survival probability
+   - Call 4: replanning, only if the user falls behind
+4. The active mission screen shows the current rescue plan, check-ins, completion tracking, and debrief.
+
+## Gemini Integration
+
+All AI calls go through:
+
+```text
+src/hooks/useGemini.js
+```
+
+The app uses only:
+
+```env
+VITE_GEMINI_API_KEY
+```
+
+No OpenAI, Anthropic, or other AI provider SDKs are used.
+
+## Rate-Limit Fallback
+
+If Gemini returns `400`, `401`, `403`, or `429` during a demo or judging session, LimitBreaker AI switches to offline emergency mode:
+
+- Triage still appears and is labeled `Offline heuristic fallback`.
+- Rescue plan still appears and is labeled `Offline schedule`.
+- Probability falls back to a realistic default.
+- Recoverable Gemini failures are not shown as fatal errors.
+
+The fallback is clearly marked as heuristic output, not Gemini output. This keeps the app usable even when API quota is temporarily exhausted.
+
+## Project Structure
+
+```text
+src/
+  agents/
+    criticalDecisionAgent.js
+    missionCodenameAgent.js
+    probabilityAgent.js
+    realityCheckAgent.js
+    replanningAgent.js
+    sacrificeAgent.js
+    scopeReductionAgent.js
+    timeAllocationAgent.js
+    triageAgent.js
+  components/
+    CheckInOverlay.jsx
+    CustomCursor.jsx
+    Header.jsx
+    LoadingSequence.jsx
+    MissionDebrief.jsx
+    RealityCheck.jsx
+    RescuePlan.jsx
+    SacrificeReport.jsx
+    SituationIntake.jsx
+    StarfieldCanvas.jsx
+    TriageOutput.jsx
+  hooks/
+    useCountdown.js
+    useGemini.js
+    useMissionState.js
+  App.jsx
+  index.css
+  main.jsx
+```
 
 ## Notes
 
-- This is a single-screen app: no accounts, no settings, no navigation.
-- Gemini calls use `gemini-2.0-flash` with structured outputs and error boundaries.
-- Browser-exposed API keys should be restricted in Google Cloud/Firebase before production use.
+Because this is a Vite frontend app, `VITE_GEMINI_API_KEY` is exposed to browser code. For production, proxy Gemini requests through a backend or serverless function if the key must remain private.
+
+## Hackathon Submission
+
+This project is aligned with:
+
+```text
+PS1: The Last-Minute Life Saver
+```
+
+For the required Google Doc content, use:
+
+```text
+PROJECT_DESCRIPTION.md
+```
+
+For final platform checks, use:
+
+```text
+SUBMISSION_CHECKLIST.md
+```
