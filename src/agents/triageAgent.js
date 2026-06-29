@@ -1,6 +1,6 @@
-import { callGeminiJSON } from '../hooks/useGemini'
+import { callAIJSON } from '../ai/provider'
 import { TRIAGE_PROMPT } from './prompts'
 
 export async function runTriageAgent(situationText) {
-  return callGeminiJSON(TRIAGE_PROMPT, situationText)
+  return callAIJSON(TRIAGE_PROMPT, situationText)
 }

@@ -12,6 +12,8 @@ export default function Header({
   deadlineMinutes,
   sessionStartTime,
   onExpire,
+  onHome,
+  showHome = false,
 }) {
   const countdown = useCountdown(deadlineMinutes, sessionStartTime, onExpire)
   const targetScore = probabilityCurrent ?? probabilityAfter ?? probabilityBefore
@@ -35,7 +37,7 @@ export default function Header({
   const timerClass = countdown.isCritical ? 'text-critical animate-pulse' : countdown.isWarning ? 'text-simplify' : 'text-white'
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-white/5 bg-void/90 backdrop-blur-xl md:h-[72px] animate-float">
+    <header className="fixed left-0 right-0 top-0 z-50 h-16 animate-float border-b border-white/5 bg-void/90 backdrop-blur-xl md:h-[72px]">
       <div className="grid h-full grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 md:px-8">
         <div className="min-w-0">
           <div className="truncate font-orbitron text-sm font-black tracking-[0.15em] text-white md:text-lg">LIMITBREAKER AI</div>
@@ -47,14 +49,33 @@ export default function Header({
             {probabilityBefore != null && probabilityAfter != null ? `${probabilityBefore}% -> ${probabilityAfter}%` : targetScore != null ? `${displayScore}%` : '--%'}
           </div>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Time Remaining</div>
-          <div className={`font-orbitron text-base font-bold md:text-2xl ${timerClass}`}>
-            {deadlineMinutes ? `${pad(countdown.hours)}:${pad(countdown.minutes)}:${pad(countdown.seconds)}` : '--:--:--'}
+        <div className="flex items-center justify-end gap-3 text-right">
+          {showHome ? (
+            <button
+              type="button"
+              className="hidden rounded border border-white/15 bg-white/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-200 transition hover:border-critical/60 hover:bg-critical/15 hover:text-white md:block"
+              onClick={onHome}
+            >
+              Discard Mission
+            </button>
+          ) : null}
+          <div>
+            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Time Remaining</div>
+            <div className={`font-orbitron text-base font-bold md:text-2xl ${timerClass}`}>
+              {deadlineMinutes ? `${pad(countdown.hours)}:${pad(countdown.minutes)}:${pad(countdown.seconds)}` : '--:--:--'}
+            </div>
           </div>
         </div>
       </div>
+      {showHome ? (
+        <button
+          type="button"
+          className="absolute right-3 top-[74px] rounded border border-white/15 bg-void/90 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-200 backdrop-blur transition hover:border-critical/60 hover:bg-critical/15 hover:text-white md:hidden"
+          onClick={onHome}
+        >
+          Discard
+        </button>
+      ) : null}
     </header>
   )
 }
-

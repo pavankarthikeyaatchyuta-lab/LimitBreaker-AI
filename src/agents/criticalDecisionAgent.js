@@ -1,8 +1,8 @@
-import { callGeminiJSON } from '../hooks/useGemini'
+import { callAIJSON } from '../ai/provider'
 import { CRITICAL_DECISION_PROMPT } from './prompts'
 
 export async function runCriticalDecisionAgent(situationText) {
-  return callGeminiJSON(
+  return callAIJSON(
     CRITICAL_DECISION_PROMPT,
     `Situation: ${situationText}`,
   )

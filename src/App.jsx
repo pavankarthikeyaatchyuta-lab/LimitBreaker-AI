@@ -18,7 +18,7 @@ import { runReplanningAgent } from './agents/replanningAgent'
 
 const surviving = (tasks) => tasks.filter((task) => task.classification !== 'DROP')
 const taskBlocks = (schedule) => schedule.filter((block) => block.type === 'TASK')
-const isRecoverableGeminiError = (error) => /Gemini API error: (400|401|403|429)/.test(String(error?.message || error))
+const isRecoverableAIError = (error) => /(Gemini|Groq|AI).*?(error|unavailable|failed|invalid JSON|TIMEOUT|NETWORK|429|RESOURCE_EXHAUSTED)|Failed to fetch/i.test(String(error?.message || error))
 const formatPlanTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 const offlineFallbackPatch = {
   fallbackMode: true,
@@ -199,7 +199,7 @@ export default function App() {
     } catch (error) {
       allocation = fallbackSchedule(aliveTasks, remainingMinutes, planStart)
       probability = { before_score: 32, after_score: 68, biggest_risk: '', most_valuable_task: '', reasoning: 'Fallback probability used because AI scheduling was unavailable.' }
-      patchState(isRecoverableGeminiError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Rescue Plan - ${error.message}` })
+      patchState(isRecoverableAIError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Rescue Plan - ${error.message}` })
     }
     const schedule = normalizeScheduleTimes(allocation.schedule || [], planStart)
     patchState({ schedule, totalTasksCut: allocation.tasks_cut_due_to_time || schedule.filter((item) => item.type === 'CUT').length })
@@ -238,7 +238,7 @@ export default function App() {
         missionTriage = await runMissionTriageAgent(situationText)
       } catch (error) {
         missionTriage = mergeMissionTriageFallback(null, situationText)
-        patchState(isRecoverableGeminiError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Mission Triage - ${error.message}` })
+        patchState(isRecoverableAIError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Mission Triage - ${error.message}` })
       }
 
       const { codename, tasks, sacrifices } = mergeMissionTriageFallback(missionTriage, situationText)
@@ -251,7 +251,7 @@ export default function App() {
           patchState({ realityQuestions: questions, phase: questions.length ? 'reality_check' : 'plan' })
           if (!questions.length) await buildPlan(tasks, deadlineMinutes, missionStart)
         } catch (error) {
-          patchState(isRecoverableGeminiError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Reality Check - ${error.message}` })
+          patchState(isRecoverableAIError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Reality Check - ${error.message}` })
           await buildPlan(tasks, deadlineMinutes, missionStart)
         }
       }, 900)
@@ -310,7 +310,7 @@ export default function App() {
         totalTasksCut: allocation.tasks_cut_due_to_time + newlyEliminated.length,
         replansCount: current.replansCount + 1,
         probabilityCurrent: Math.max(5, (current.probabilityCurrent || current.probabilityAfter || 50) - 15),
-        ...(isRecoverableGeminiError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Replanning - ${error.message}` }),
+        ...(isRecoverableAIError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Replanning - ${error.message}` }),
       }))
     }
   }, [patchState, state.completedTasks, state.schedule, timeRemainingSeconds])
@@ -328,7 +328,7 @@ export default function App() {
   }, [patchState, state.phase, state.sessionStartTime])
 
   useEffect(() => {
-    if (state.error.includes('Gemini API error:')) {
+    if (/Gemini API error:|Groq API error:|AI unavailable/.test(state.error)) {
       patchState({ error: '' })
     }
   }, [patchState, state.error])
@@ -345,6 +345,8 @@ export default function App() {
         deadlineMinutes={state.deadlineMinutes}
         sessionStartTime={state.sessionStartTime}
         onExpire={expire}
+        onHome={resetMission}
+        showHome={state.phase !== 'intake'}
       />
 
       {state.error ? <div className="fixed bottom-4 left-4 right-4 z-[80] rounded-lg border border-critical/40 bg-critical/15 p-3 font-mono text-xs text-critical backdrop-blur md:left-auto md:w-[420px]">{state.error}</div> : null}

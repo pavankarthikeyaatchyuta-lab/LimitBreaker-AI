@@ -1,7 +1,7 @@
-import { callGeminiJSON } from '../hooks/useGemini'
+import { callAIJSON } from '../ai/provider'
 import { SACRIFICE_PROMPT } from './prompts'
 
 export async function runSacrificeAgent(droppedTasks) {
   if (!droppedTasks.length) return { sacrifices: [] }
-  return callGeminiJSON(SACRIFICE_PROMPT, JSON.stringify({ droppedTasks }))
+  return callAIJSON(SACRIFICE_PROMPT, JSON.stringify({ droppedTasks }))
 }
