@@ -172,7 +172,13 @@ This project is aligned with:
 PS1: The Last-Minute Life Saver
 ```
 
-Use these files for submission support:
+Submission links:
+
+- Live demo: https://limitbreaker-ai-20260629.web.app
+- GitHub repository: https://github.com/pavankarthikeyaatchyuta-lab/LimitBreaker-AI
+- Project description Google Doc: https://docs.google.com/document/d/1SCzYq6HqXADcEnJz7jTF5Q_HsWKs_gib/edit?usp=sharing&ouid=113868363526693182345&rtpof=true&sd=true
+
+Local submission support files:
 
 ```text
 PROJECT_DESCRIPTION.md
