@@ -7,6 +7,12 @@
   cursor: none !important;
 }
 
+textarea,
+input,
+[contenteditable='true'] {
+  cursor: text !important;
+}
+
 html,
 body,
 #root {
@@ -48,7 +54,8 @@ body::before {
 }
 
 .cursor-comet,
-.cursor-comet-tail {
+.cursor-trail,
+.cursor-trail span {
   position: fixed;
   left: 0;
   top: 0;
@@ -58,67 +65,61 @@ body::before {
 }
 
 .cursor-comet {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
+  border: 2px solid rgba(2, 6, 23, 0.95);
   background:
-    radial-gradient(circle at 42% 42%, #ffffff 0 12%, #e0f2fe 13% 25%, var(--comet-color, #ffffff) 26% 48%, rgba(96, 165, 250, 0.45) 49% 70%, rgba(255, 255, 255, 0) 72%);
+    radial-gradient(circle at 44% 42%, #ffffff 0 28%, #e0f2fe 29% 45%, var(--comet-color, #ffffff) 46% 70%, rgba(59, 130, 246, 0.9) 71% 100%);
   box-shadow:
-    0 0 10px #ffffff,
-    0 0 22px var(--comet-color, #ffffff),
-    0 0 46px rgba(59, 130, 246, 0.85),
-    0 0 82px rgba(14, 165, 233, 0.35);
-  filter: saturate(1.45);
-  animation: comet-pulse 1.6s ease-in-out infinite;
-  mix-blend-mode: screen;
+    0 0 0 3px rgba(255, 255, 255, 0.22),
+    0 0 16px #ffffff,
+    0 0 32px var(--comet-color, #ffffff),
+    0 0 52px rgba(59, 130, 246, 0.85);
+  filter: saturate(1.35);
 }
 
 .cursor-comet::after {
   content: '';
   position: absolute;
-  inset: -14px;
+  inset: -5px;
   border-radius: inherit;
-  border: 2px solid color-mix(in srgb, var(--comet-color, #ffffff), transparent 25%);
-  box-shadow: 0 0 26px color-mix(in srgb, var(--comet-color, #ffffff), transparent 15%);
-  opacity: 0.8;
-  animation: comet-halo 1.8s ease-out infinite;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  opacity: 0.75;
 }
 
 .cursor-comet-core {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: #fff;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 12px #fff, 0 0 24px #fff;
+  box-shadow: 0 0 10px #fff, 0 0 22px #fff;
 }
 
-.cursor-comet-tail {
-  width: 180px;
-  height: 34px;
-  transform-origin: 158px 50%;
+.cursor-trail {
+  z-index: 9998;
+}
+
+.cursor-comet-hidden,
+.cursor-comet-hidden ~ .cursor-trail,
+body:has(textarea:hover) .cursor-trail,
+body:has(input:hover) .cursor-trail,
+body:has([contenteditable='true']:hover) .cursor-trail {
+  opacity: 0 !important;
+}
+
+.cursor-trail span {
+  height: 2px;
+  transform-origin: 100% 50%;
   border-radius: 999px;
-  background:
-    radial-gradient(circle at 96% 50%, rgba(255, 255, 255, 1), rgba(224, 242, 254, 0.72) 14%, rgba(96, 165, 250, 0.3) 27%, rgba(255, 255, 255, 0) 36%),
-    linear-gradient(90deg, rgba(59, 130, 246, 0), rgba(59, 130, 246, 0.08) 18%, rgba(125, 211, 252, 0.38) 58%, rgba(255, 255, 255, 0.92) 100%);
-  filter: blur(2px) drop-shadow(0 0 18px rgba(96, 165, 250, 0.8)) drop-shadow(0 0 34px rgba(14, 165, 233, 0.42));
+  background: linear-gradient(90deg, rgba(125, 211, 252, 0), rgba(255, 255, 255, 0.92));
+  filter: blur(0.45px) drop-shadow(0 0 7px rgba(125, 211, 252, 0.85));
   mix-blend-mode: screen;
-}
-
-.cursor-comet-tail::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 18px;
-  top: 50%;
-  height: 3px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95));
-  transform: translateY(-50%);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+  transition: opacity 120ms linear;
 }
 
 .cursor-comet-hot {

@@ -148,6 +148,31 @@ function fallbackSchedule(tasks, remainingMinutes, startTimestamp = Date.now()) 
   return { schedule, total_tasks: tasks.length, tasks_cut_due_to_time: schedule.filter((item) => item.type === 'CUT').length }
 }
 
+function fallbackProbability(tasks, schedule, remainingMinutes) {
+  const taskList = Array.isArray(tasks) ? tasks : []
+  const blocks = Array.isArray(schedule) ? schedule : []
+  const critical = taskList.filter((task) => task.classification === 'CRITICAL').length
+  const simplify = taskList.filter((task) => task.classification === 'SIMPLIFY').length
+  const dropped = taskList.filter((task) => task.classification === 'DROP').length
+  const cut = blocks.filter((block) => block.type === 'CUT').length
+  const neededMinutes = taskList
+    .filter((task) => task.classification !== 'DROP')
+    .reduce((sum, task) => sum + Math.max(10, Number(task.estimated_minutes || 20)), 0)
+  const timeRatio = neededMinutes ? Math.min(1.4, Math.max(0.25, Number(remainingMinutes || 0) / neededMinutes)) : 0.8
+  const complexityPenalty = critical * 5 + simplify * 2 + cut * 8
+  const sacrificeBoost = Math.min(18, dropped * 7)
+  const before_score = Math.max(8, Math.min(58, Math.round(50 * timeRatio - complexityPenalty + 20)))
+  const after_score = Math.max(before_score + 8, Math.min(92, Math.round(before_score + 22 + sacrificeBoost - cut * 9 + Math.min(12, timeRatio * 8))))
+
+  return {
+    before_score,
+    after_score,
+    biggest_risk: cut ? 'Not enough time for every surviving task.' : critical > 3 ? 'Too many critical tasks remain.' : 'Execution drift.',
+    most_valuable_task: taskList.find((task) => task.classification === 'CRITICAL')?.name || taskList[0]?.name || '',
+    reasoning: 'Offline probability estimated from deadline pressure, task count, cuts, and sacrifices.',
+  }
+}
+
 function fallbackSacrifices(dropped) {
   return dropped.map((task) => ({
     task_name: task.name,
@@ -198,16 +223,16 @@ export default function App() {
       probability = plan.probability
     } catch (error) {
       allocation = fallbackSchedule(aliveTasks, remainingMinutes, planStart)
-      probability = { before_score: 32, after_score: 68, biggest_risk: '', most_valuable_task: '', reasoning: 'Fallback probability used because AI scheduling was unavailable.' }
+      probability = fallbackProbability(tasks, allocation.schedule, remainingMinutes)
       patchState(isRecoverableAIError(error) ? offlineFallbackPatch : { error: `AGENT FAILURE: Rescue Plan - ${error.message}` })
     }
     const schedule = normalizeScheduleTimes(allocation.schedule || [], planStart)
     patchState({ schedule, totalTasksCut: allocation.tasks_cut_due_to_time || schedule.filter((item) => item.type === 'CUT').length })
 
     patchState({
-      probabilityBefore: probability?.before_score ?? 32,
-      probabilityAfter: probability?.after_score ?? 68,
-      probabilityCurrent: probability?.after_score ?? 68,
+      probabilityBefore: probability?.before_score ?? fallbackProbability(tasks, schedule, remainingMinutes).before_score,
+      probabilityAfter: probability?.after_score ?? fallbackProbability(tasks, schedule, remainingMinutes).after_score,
+      probabilityCurrent: probability?.after_score ?? fallbackProbability(tasks, schedule, remainingMinutes).after_score,
       biggestRisk: probability?.biggest_risk || '',
       mostValuableTask: probability?.most_valuable_task || '',
     })
@@ -228,8 +253,20 @@ export default function App() {
       error: '',
       fallbackMode: false,
       fallbackReason: '',
+      missionCodename: '',
+      tasks: [],
+      sacrifices: [],
+      realityQuestions: [],
+      schedule: [],
+      probabilityBefore: null,
+      probabilityAfter: null,
+      probabilityCurrent: null,
+      biggestRisk: '',
+      mostValuableTask: '',
       completedTasks: [],
       replansCount: 0,
+      totalTasksCut: 0,
+      newlyEliminated: [],
     })
 
     try {

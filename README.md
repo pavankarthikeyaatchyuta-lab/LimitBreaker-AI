@@ -1,16 +1,71 @@
 # LimitBreaker AI
 
-Emergency deadline triage for when the clock is already against you.
+LimitBreaker AI is an emergency deadline rescue app. It turns a messy last-minute situation into a ruthless action plan: what must be finished, what should be simplified, what should be dropped, and what to do next.
 
-LimitBreaker AI is a single-page React app that turns a last-minute deadline dump into a ruthless survival plan: what stays, what gets simplified, what gets eliminated, and what to do next.
+It is built for hackathon/problem-statement use cases where someone has very little time left and needs a clear survival plan instead of generic motivation.
+
+![LimitBreaker AI intake screen](docs/screenshots/intake.png)
+
+## What It Does
+
+- Reads a free-form deadline dump.
+- Extracts the important tasks and constraints.
+- Classifies work as `CRITICAL`, `SIMPLIFY`, or `DROP`.
+- Creates a sacrifice report for eliminated work.
+- Asks reality-check questions when answers could change the plan.
+- Builds a timed rescue schedule.
+- Tracks progress with check-ins.
+- Replans if the user falls behind.
+- Falls back to offline heuristic triage if online AI services are unavailable.
+
+![Reality check screen](docs/screenshots/triage-plan.png)
+
+![Triage and rescue plan screen](docs/screenshots/rescue-plan.png)
+
+## Why It Is Useful
+
+Most productivity tools assume you have enough time to plan calmly. LimitBreaker AI is for the opposite moment: the deadline is close, the work is unfinished, and the user needs to decide what survives.
+
+The app is useful for:
+
+- hackathon submissions
+- assignments and reports
+- exam preparation
+- job applications
+- demo preparation
+- any deadline where scope has to be cut fast
+
+## How To Use
+
+1. Open the app.
+2. Paste or type the situation in plain language.
+3. Include the deadline, what is done, and what is unfinished.
+4. Click `ACTIVATE LIMITBREAKER`.
+5. Review the triage cards.
+6. Answer any reality-check questions.
+7. Follow the rescue schedule.
+8. Use `CHECK IN NOW` if progress changes.
+9. Use `Discard Mission` to reset the current mission.
+
+Example input:
+
+```text
+Hackathon submission in 2 hours. PPT half done, README missing,
+demo video not recorded, deployment failing, GitHub link needed,
+extra animations are nice to have.
+```
 
 ## Tech Stack
 
-- React + Vite
+- React
+- Vite
 - Tailwind CSS
-- Gemini 2.0 Flash via Google AI Studio API
-- localStorage session persistence
-- Animated canvas starfield and custom reticle cursor
+- Google AI Studio / Gemini as the primary AI provider
+- Groq as automatic fallback provider
+- Offline heuristic fallback when online AI fails
+- localStorage for mission persistence
+- Canvas space background
+- Custom pointer trail
 
 ## Setup
 
@@ -26,13 +81,14 @@ Create a local environment file:
 cp .env.example .env.local
 ```
 
-Set your Gemini API key:
+Add API keys:
 
 ```env
 VITE_GEMINI_API_KEY=your_google_ai_studio_key_here
+VITE_GROQ_API_KEY=your_groq_api_key_here
 ```
 
-Run the app:
+Run locally:
 
 ```bash
 npm run dev
@@ -64,84 +120,51 @@ npm run preview
 
 Serves the production build locally.
 
-## How It Works
+## AI Flow
 
-1. User describes the emergency deadline.
-2. The app parses deadline text such as `4 hours`, `90 minutes`, or `at 5:30pm`.
-3. Gemini agents generate the mission plan using a reduced-call pipeline:
-   - Call 1: mission codename, triage classifications, scope reductions, and sacrifice report
-   - Call 2: reality-check questions
-   - Call 3: rescue schedule and survival probability
-   - Call 4: replanning, only if the user falls behind
-4. The active mission screen shows the current rescue plan, check-ins, completion tracking, and debrief.
-
-## Gemini Integration
-
-All AI calls go through:
+All agent files call a shared AI provider layer:
 
 ```text
-src/hooks/useGemini.js
+src/ai/provider.js
 ```
 
-The app uses only:
+The flow is:
 
-```env
-VITE_GEMINI_API_KEY
-```
+1. Try the primary AI provider.
+2. Retry once if it fails.
+3. Use the backup provider if the failure is recoverable.
+4. Use offline emergency triage if both online providers fail.
 
-No OpenAI, Anthropic, or other AI provider SDKs are used.
+Recoverable failures include rate limits, network failure, timeout, API failure, and invalid JSON.
 
-## Rate-Limit Fallback
+## Offline Mode
 
-If Gemini returns `400`, `401`, `403`, or `429` during a demo or judging session, LimitBreaker AI switches to offline emergency mode:
+If online AI is unavailable, the app still works. Offline mode uses simple emergency rules:
 
-- Triage still appears and is labeled `Offline heuristic fallback`.
-- Rescue plan still appears and is labeled `Offline schedule`.
-- Probability falls back to a realistic default.
-- Recoverable Gemini failures are not shown as fatal errors.
+- tasks involving submit, deploy, exam, or interview become `CRITICAL`
+- documentation becomes `SIMPLIFY`
+- polish and nice-to-have work becomes `DROP`
+- probability and schedule are estimated from task load and time remaining
 
-The fallback is clearly marked as heuristic output, not Gemini output. This keeps the app usable even when API quota is temporarily exhausted.
+Offline output is clearly marked as heuristic fallback inside the app.
 
 ## Project Structure
 
 ```text
 src/
-  agents/
-    criticalDecisionAgent.js
-    missionCodenameAgent.js
-    probabilityAgent.js
-    realityCheckAgent.js
-    replanningAgent.js
-    sacrificeAgent.js
-    scopeReductionAgent.js
-    timeAllocationAgent.js
-    triageAgent.js
-  components/
-    CheckInOverlay.jsx
-    CustomCursor.jsx
-    Header.jsx
-    LoadingSequence.jsx
-    MissionDebrief.jsx
-    RealityCheck.jsx
-    RescuePlan.jsx
-    SacrificeReport.jsx
-    SituationIntake.jsx
-    StarfieldCanvas.jsx
-    TriageOutput.jsx
-  hooks/
-    useCountdown.js
-    useGemini.js
-    useMissionState.js
-  App.jsx
-  index.css
-  main.jsx
+  agents/        Prompt-specific agent wrappers
+  ai/            Provider retry and fallback layer
+  components/    UI components
+  hooks/         Countdown, mission state, compatibility AI hook
+  App.jsx        Mission state machine and fallback logic
+  index.css      Tailwind and custom visual styling
 ```
 
 ## Notes
 
-Because this is a Vite frontend app, `VITE_GEMINI_API_KEY` is exposed to browser code. For production, proxy Gemini requests through a backend or serverless function if the key must remain private.
+This is a frontend Vite app, so `VITE_*` environment variables are exposed to browser code. For production use, route AI calls through a backend or serverless function if the keys must remain private.
 
-## Hackathon Submission
+## Hackathon Context
 
 This project is aligned with:
 
@@ -149,14 +172,9 @@ This project is aligned with:
 PS1: The Last-Minute Life Saver
 ```
 
-For the required Google Doc content, use:
+Use these files for submission support:
 
 ```text
 PROJECT_DESCRIPTION.md
-```
-
-For final platform checks, use:
-
-```text
 SUBMISSION_CHECKLIST.md
 ```
