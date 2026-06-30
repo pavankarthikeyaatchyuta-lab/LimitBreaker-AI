@@ -1,12 +1,16 @@
 # LimitBreaker AI
 
+Problem statement: **PS1 — The Last-Minute Life Saver**
+
 LimitBreaker AI is an emergency deadline rescue app. It turns a messy last-minute situation into a ruthless action plan: what must be finished, what should be simplified, what should be dropped, and what to do next.
 
-It is built for hackathon/problem-statement use cases where someone has very little time left and needs a clear survival plan instead of generic motivation.
+**▶ Live demo: https://limitbreaker-ai-20260629.web.app**
+
+It is built for the moment when there is very little time left and the user needs a clear survival plan instead of generic motivation.
 
 ![LimitBreaker AI intake screen](docs/screenshots/intake.png)
 
-## What It Does
+## ⚡ What It Does
 
 - Reads a free-form deadline dump.
 - Extracts the important tasks and constraints.
@@ -16,36 +20,28 @@ It is built for hackathon/problem-statement use cases where someone has very lit
 - Builds a timed rescue schedule.
 - Tracks progress with check-ins.
 - Replans if the user falls behind.
-- Falls back to offline heuristic triage if online AI services are unavailable.
+- Falls back to a Groq provider, then to offline heuristic triage, if the primary AI is unavailable.
 
 ![Reality check screen](docs/screenshots/triage-plan.png)
 
 ![Triage and rescue plan screen](docs/screenshots/rescue-plan.png)
 
-## Why It Is Useful
+## 🎯 Why It Is Useful
 
 Most productivity tools assume you have enough time to plan calmly. LimitBreaker AI is for the opposite moment: the deadline is close, the work is unfinished, and the user needs to decide what survives.
 
-The app is useful for:
+Useful for hackathon submissions, assignments and reports, exam prep, job applications, demo prep — any deadline where scope has to be cut fast.
 
-- hackathon submissions
-- assignments and reports
-- exam preparation
-- job applications
-- demo preparation
-- any deadline where scope has to be cut fast
-
-## How To Use
+## 🚀 How To Use
 
 1. Open the app.
-2. Paste or type the situation in plain language.
-3. Include the deadline, what is done, and what is unfinished.
-4. Click `ACTIVATE LIMITBREAKER`.
-5. Review the triage cards.
-6. Answer any reality-check questions.
-7. Follow the rescue schedule.
-8. Use `CHECK IN NOW` if progress changes.
-9. Use `Discard Mission` to reset the current mission.
+2. Paste or type the situation in plain language (include the deadline, what is done, and what is unfinished).
+3. Click `ACTIVATE LIMITBREAKER`.
+4. Review the triage cards.
+5. Answer any reality-check questions.
+6. Follow the rescue schedule.
+7. Use `CHECK IN NOW` if progress changes.
+8. Use `Discard Mission` to reset.
 
 Example input:
 
@@ -55,19 +51,18 @@ demo video not recorded, deployment failing, GitHub link needed,
 extra animations are nice to have.
 ```
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-- React
-- Vite
+- React 19
+- Vite 7
 - Tailwind CSS
-- Google AI Studio / Gemini as the primary AI provider
-- Groq as automatic fallback provider
-- Offline heuristic fallback when online AI fails
+- Google AI Studio / Gemini 2.0 Flash — primary AI provider
+- Groq — automatic fallback provider
+- Offline heuristic fallback when both online providers fail
 - localStorage for mission persistence
-- Canvas space background
-- Custom pointer trail
+- HTML Canvas space background and custom pointer trail
 
-## Setup
+## ⚙️ Setup
 
 Install dependencies:
 
@@ -94,93 +89,60 @@ Run locally:
 npm run dev
 ```
 
-Open:
+Open `http://127.0.0.1:5173`.
 
-```text
-http://127.0.0.1:5173
-```
-
-## Scripts
+## 📜 Scripts
 
 ```bash
-npm run dev
+npm run dev      # Start the Vite dev server
+npm run build    # Build the production bundle into dist/
+npm run preview  # Serve the production build locally
 ```
 
-Starts the Vite dev server.
+## 🔥 Deploy (Firebase Hosting)
 
 ```bash
 npm run build
+firebase deploy
 ```
 
-Builds the production bundle into `dist/`.
+`firebase.json` serves the Vite `dist/` directory and rewrites all routes to `index.html`.
 
-```bash
-npm run preview
-```
+## 🧠 AI Flow
 
-Serves the production build locally.
+All agents call a shared provider layer at `src/ai/provider.js`:
 
-## AI Flow
+1. Try Gemini (primary).
+2. Retry once if the failure is recoverable.
+3. Fall back to Groq if Gemini still fails.
+4. Fall back to offline heuristic triage if both online providers fail.
 
-All agent files call a shared AI provider layer:
+Recoverable failures include rate limits, network failure, timeout, API errors, and invalid JSON.
 
-```text
-src/ai/provider.js
-```
+## 📴 Offline Mode
 
-The flow is:
-
-1. Try the primary AI provider.
-2. Retry once if it fails.
-3. Use the backup provider if the failure is recoverable.
-4. Use offline emergency triage if both online providers fail.
-
-Recoverable failures include rate limits, network failure, timeout, API failure, and invalid JSON.
-
-## Offline Mode
-
-If online AI is unavailable, the app still works. Offline mode uses simple emergency rules:
+If online AI is unavailable, the app still works using simple emergency rules:
 
 - tasks involving submit, deploy, exam, or interview become `CRITICAL`
 - documentation becomes `SIMPLIFY`
 - polish and nice-to-have work becomes `DROP`
 - probability and schedule are estimated from task load and time remaining
 
-Offline output is clearly marked as heuristic fallback inside the app.
+Offline output is clearly labelled as a heuristic fallback inside the app.
 
-## Project Structure
+## 📁 Project Structure
 
 ```text
 src/
   agents/        Prompt-specific agent wrappers
-  ai/            Provider retry and fallback layer
+  ai/            Gemini + Groq providers and the retry/fallback layer
   components/    UI components
-  hooks/         Countdown, mission state, compatibility AI hook
-  App.jsx        Mission state machine and fallback logic
+  hooks/         Countdown, mission state, AI hook
+  App.jsx        Mission state machine and offline fallback logic
+  main.jsx       App entry
   index.css      Tailwind and custom visual styling
 ```
 
-## Notes
+## 📝 Notes
 
-This is a frontend Vite app, so `VITE_*` environment variables are exposed to browser code. For production use, route AI calls through a backend or serverless function if the keys must remain private.
-
-## Hackathon Context
-
-This project is aligned with:
-
-```text
-PS1: The Last-Minute Life Saver
-```
-
-Submission links:
-
-- Live demo: https://limitbreaker-ai-20260629.web.app
-- GitHub repository: https://github.com/pavankarthikeyaatchyuta-lab/LimitBreaker-AI
-- Project description Google Doc: https://docs.google.com/document/d/1SCzYq6HqXADcEnJz7jTF5Q_HsWKs_gib/edit?usp=sharing&ouid=113868363526693182345&rtpof=true&sd=true
-
-Local submission support files:
-
-```text
-PROJECT_DESCRIPTION.md
-SUBMISSION_CHECKLIST.md
-```
+This is a frontend Vite app, so `VITE_*` environment variables are exposed to browser code. For production, route AI calls through a backend or serverless function so the keys stay private, and restrict the keys in Google Cloud / Groq before going public.
